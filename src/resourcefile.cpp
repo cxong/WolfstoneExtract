@@ -1,0 +1,431 @@
+/*
+** resourcefile.cpp
+**
+** Base classes for resource file management
+**
+**---------------------------------------------------------------------------
+** Copyright 2009 Christoph Oelckers
+** All rights reserved.
+**
+** Redistribution and use in source and binary forms, with or without
+** modification, are permitted provided that the following conditions
+** are met:
+**
+** 1. Redistributions of source code must retain the above copyright
+**    notice, this list of conditions and the following disclaimer.
+** 2. Redistributions in binary form must reproduce the above copyright
+**    notice, this list of conditions and the following disclaimer in the
+**    documentation and/or other materials provided with the distribution.
+** 3. The name of the author may not be used to endorse or promote products
+**    derived from this software without specific prior written permission.
+**
+** THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+** IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+** OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+** IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+** INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+** NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+** DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+** THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+**---------------------------------------------------------------------------
+**
+**
+*/
+
+#include <cstring>
+
+#include "doomerrors.h"
+#include "resourcefile.h"
+
+//==========================================================================
+//
+// Base class for resource lumps
+//
+//==========================================================================
+
+FResourceLump::~FResourceLump()
+{
+	if (Cache != NULL && RefCount >= 0)
+	{
+		delete [] Cache;
+		Cache = NULL;
+	}
+	Owner = NULL;
+}
+
+
+//==========================================================================
+//
+// Sets up the lump name information for anything not coming from a WAD file.
+//
+//==========================================================================
+
+void FResourceLump::LumpNameSetup(FString iname)
+{
+	long slash = iname.LastIndexOf('/');
+	FString base = (slash >= 0) ? iname.Mid(slash + 1) : iname;
+	base.Truncate(base.LastIndexOf('.'));
+	strncpy(Name, base, 8);
+	Name[8] = 0;
+	FullName = iname;
+}
+
+
+//==========================================================================
+//
+// Returns the owner's FileReader if it can be used to access this lump
+//
+//==========================================================================
+
+FileReader *FResourceLump::GetReader()
+{
+	return NULL;
+}
+
+//==========================================================================
+//
+// Returns a file reader to the lump's cache
+//
+//==========================================================================
+
+FileReader *FResourceLump::NewReader()
+{
+	return new FLumpReader(this);
+}
+
+//==========================================================================
+//
+// Caches a lump's content and increases the reference counter
+//
+//==========================================================================
+
+void *FResourceLump::CacheLump()
+{
+	if (Cache != NULL)
+	{
+		if (RefCount > 0) RefCount++;
+	}
+	else if (LumpSize > 0)
+	{
+		FillCache();
+	}
+	return Cache;
+}
+
+//==========================================================================
+//
+// Decrements reference counter and frees lump if counter reaches 0
+//
+//==========================================================================
+
+int FResourceLump::ReleaseCache()
+{
+	if (LumpSize > 0 && RefCount > 0)
+	{
+		if (--RefCount == 0)
+		{
+			delete [] Cache;
+			Cache = NULL;
+		}
+	}
+	return RefCount;
+}
+
+//==========================================================================
+//
+// Opens a resource file
+//
+//==========================================================================
+
+typedef FResourceFile * (*CheckFunc)(const char *filename, FileReader *file, bool quiet);
+
+FResourceFile *CheckIdcl(const char *filename, FileReader *file, bool quiet);
+
+#define COUNTOF_FUNCS 1
+static CheckFunc funcs[COUNTOF_FUNCS] = { CheckIdcl };
+
+FResourceFile *FResourceFile::OpenResourceFile(const char *filename, FileReader *file, bool quiet)
+{
+	if (file == NULL)
+	{
+		try
+		{
+			file = new FileReader(filename);
+		}
+		catch (CRecoverableError &)
+		{
+			return NULL;
+		}
+	}
+
+	for(size_t i = 0; i < COUNTOF_FUNCS; i++)
+	{
+		FResourceFile *resfile = funcs[i](filename, file, quiet);
+		if (resfile != NULL) return resfile;
+	}
+	return NULL;
+}
+
+//==========================================================================
+//
+// Resource file base class
+//
+//==========================================================================
+
+FResourceFile::FResourceFile(const char *filename, FileReader *r)
+{
+	if (filename != NULL)
+	{
+		char* cFilename = new char[strlen(filename) + 1];
+		memcpy(cFilename, filename, strlen(filename) + 1);
+		Filename = cFilename;
+	}
+	else Filename = NULL;
+	Reader = r;
+	FirstLump = 0;
+}
+
+
+FResourceFile::~FResourceFile()
+{
+	if (Filename != NULL) delete [] Filename;
+	delete Reader;
+}
+
+int lumpcmp(const void * a, const void * b)
+{
+	FResourceLump * rec1 = (FResourceLump *)a;
+	FResourceLump * rec2 = (FResourceLump *)b;
+
+	return rec1->FullName.CompareNoCase(rec2->FullName);
+}
+
+//==========================================================================
+//
+// FResourceFile :: PostProcessArchive
+//
+// Sorts files by name.
+// For files named "filter/<game>/*": Using the same filter rules as config
+// autoloading, move them to the end and rename them without the "filter/"
+// prefix. Filtered files that don't match are deleted.
+//
+//==========================================================================
+
+void FResourceFile::PostProcessArchive(void *lumps, size_t lumpsize)
+{
+	// Entries in archives are sorted alphabetically
+	qsort(lumps, NumLumps, lumpsize, lumpcmp);
+}
+
+//==========================================================================
+//
+// FResourceFile :: FilterLumps
+//
+// Finds any lumps between [0,<max>) that match the pattern
+// "filter/<filtername>/*" and moves them to the end of the lump list.
+// Returns the number of lumps moved.
+//
+//==========================================================================
+
+int FResourceFile::FilterLumps(FString filtername, void *lumps, size_t lumpsize, uint32_t max)
+{
+	FString filter;
+	uint32_t start, end;
+
+	if (filtername.IsEmpty())
+	{
+		return 0;
+	}
+	filter << "filter/" << filtername << '/';
+	if (FindPrefixRange(filter, lumps, lumpsize, max, start, end))
+	{
+		void *from = (uint8_t *)lumps + start * lumpsize;
+
+		// Remove filter prefix from every name
+		void *lump_p = from;
+		for (uint32_t i = start; i < end; ++i, lump_p = (uint8_t *)lump_p + lumpsize)
+		{
+			FResourceLump *lump = (FResourceLump *)lump_p;
+			assert(lump->FullName.CompareNoCase(filter, (int)filter.Len()) == 0);
+			lump->LumpNameSetup(lump->FullName.Mid(filter.Len()));
+		}
+
+		// Move filtered lumps to the end of the lump list.
+		size_t count = (end - start) * lumpsize;
+		void *to = (uint8_t *)lumps + NumLumps * lumpsize - count;
+		assert (to >= from);
+
+		if (from != to)
+		{
+			// Copy filtered lumps to a temporary buffer.
+			uint8_t *filteredlumps = new uint8_t[count];
+			memcpy(filteredlumps, from, count);
+
+			// Shift lumps left to make room for the filtered ones at the end.
+			memmove(from, (uint8_t *)from + count, (NumLumps - end) * lumpsize);
+
+			// Copy temporary buffer to newly freed space.
+			memcpy(to, filteredlumps, count);
+
+			delete[] filteredlumps;
+		}
+	}
+	return end - start;
+}
+
+//==========================================================================
+//
+// FResourceFile :: JunkLeftoverFilters
+//
+// Deletes any lumps beginning with "filter/" that were not matched.
+//
+//==========================================================================
+
+void FResourceFile::JunkLeftoverFilters(void *lumps, size_t lumpsize, uint32_t max)
+{
+	uint32_t start, end;
+	if (FindPrefixRange("filter/", lumps, lumpsize, max, start, end))
+	{
+		// Since the resource lumps may contain non-POD data besides the
+		// full name, we "delete" them by erasing their names so they
+		// can't be found.
+		void *stop = (uint8_t *)lumps + end * lumpsize;
+		for (void *p = (uint8_t *)lumps + start * lumpsize; p < stop; p = (uint8_t *)p + lumpsize)
+		{
+			FResourceLump *lump = (FResourceLump *)p;
+			lump->FullName = 0;
+			lump->Name[0] = '\0';
+			lump->Namespace = -1; // ns_hidden
+		}
+	}
+}
+
+//==========================================================================
+//
+// FResourceFile :: FindPrefixRange
+//
+// Finds a range of lumps that start with the prefix string. <start> is left
+// indicating the first matching one. <end> is left at one plus the last
+// matching one.
+//
+//==========================================================================
+
+bool FResourceFile::FindPrefixRange(FString filter, void *lumps, size_t lumpsize, uint32_t maxlump, uint32_t &start, uint32_t &end)
+{
+	uint32_t min, max, mid, inside;
+	FResourceLump *lump;
+	int cmp;
+
+	end = start = 0;
+
+	// Pretend that our range starts at 1 instead of 0 so that we can avoid
+	// unsigned overflow if the range starts at the first lump.
+	lumps = (uint8_t *)lumps - lumpsize;
+
+	// Binary search to find any match at all.
+	min = 1, max = maxlump;
+	while (min <= max)
+	{
+		mid = min + (max - min) / 2;
+		lump = (FResourceLump *)((uint8_t *)lumps + mid * lumpsize);
+		cmp = lump->FullName.CompareNoCase(filter, (int)filter.Len());
+		if (cmp == 0)
+			break;
+		else if (cmp < 0)
+			min = mid + 1;
+		else		
+			max = mid - 1;
+	}
+	if (max < min)
+	{ // matched nothing
+		return false;
+	}
+
+	// Binary search to find first match.
+	inside = mid;
+	min = 1, max = mid;
+	while (min <= max)
+	{
+		mid = min + (max - min) / 2;
+		lump = (FResourceLump *)((uint8_t *)lumps + mid * lumpsize);
+		cmp = lump->FullName.CompareNoCase(filter, (int)filter.Len());
+		// Go left on matches and right on misses.
+		if (cmp == 0)
+			max = mid - 1;
+		else
+			min = mid + 1;
+	}
+	start = mid + (cmp != 0) - 1;
+
+	// Binary search to find last match.
+	min = inside, max = maxlump;
+	while (min <= max)
+	{
+		mid = min + (max - min) / 2;
+		lump = (FResourceLump *)((uint8_t *)lumps + mid * lumpsize);
+		cmp = lump->FullName.CompareNoCase(filter, (int)filter.Len());
+		// Go right on matches and left on misses.
+		if (cmp == 0)
+			min = mid + 1;
+		else
+			max = mid - 1;
+	}
+	end = mid - (cmp != 0);
+	return true;
+}
+
+//==========================================================================
+//
+// Caches a lump's content and increases the reference counter
+//
+//==========================================================================
+
+FileReader *FUncompressedLump::GetReader()
+{
+	Owner->Reader->Seek(Position, SEEK_SET);
+	return Owner->Reader;
+}
+
+//==========================================================================
+//
+// Caches a lump's content and increases the reference counter
+//
+//==========================================================================
+
+int FUncompressedLump::FillCache()
+{
+	const char * buffer = Owner->Reader->GetBuffer();
+
+	if (buffer != NULL)
+	{
+		// This is an in-memory file so the cache can point directly to the file's data.
+		Cache = const_cast<char*>(buffer) + Position;
+		RefCount = -1;
+		return -1;
+	}
+
+	Owner->Reader->Seek(Position, SEEK_SET);
+	Cache = new char[LumpSize];
+	Owner->Reader->Read(Cache, LumpSize);
+	RefCount = 1;
+	return 1;
+}
+
+//==========================================================================
+//
+// Base class for uncompressed resource files
+//
+//==========================================================================
+
+FUncompressedFile::FUncompressedFile(const char *filename, FileReader *r)
+: FResourceFile(filename, r)
+{
+	Lumps = NULL;
+}
+
+FUncompressedFile::~FUncompressedFile()
+{
+	if (Lumps != NULL) delete [] Lumps;
+}
