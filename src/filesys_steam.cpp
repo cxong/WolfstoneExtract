@@ -44,6 +44,7 @@
 
 #include "doomerrors.h"
 #include "filesys_steam.h"
+#include "filesys.h"
 #include "scanner.h"
 #include "tarray.h"
 
@@ -180,7 +181,7 @@ static TArray<FString> ParseSteamRegistry(const char* path)
 	long size;
 
 	// Read registry data
-	FILE* registry = fopen(path, "rb");
+	FILE* registry = File(path).open("rb");
 	if(!registry)
 		return dirs;
 

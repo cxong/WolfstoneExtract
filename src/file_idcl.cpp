@@ -45,39 +45,65 @@
 #define Printf printf
 
 #pragma pack(push, 1)
-struct FIdclHeader
+namespace IDCL
 {
-	char magic[4];
-	uint32_t version;
-	char pad[32];
-	uint32_t files;
-	char pas2[4];
-	uint32_t ids;
-	char pad3[20];
-	uint64_t stringTableOffset;
-	char pad4[8];
-	uint64_t dirOffset;
-	char pad5[8];
-	uint64_t idOffset;
-	uint64_t dataOffset;
-};
+	struct B
+	{
+		struct FIdclHeader
+		{
+			char magic[4];
+			uint32_t version;
+			char pad[24];
+			uint32_t files;
+			char pas2[4];
+			uint32_t ids;
+			char pad3[20];
+			uint64_t stringTableOffset;
+			char pad4[8];
+			uint64_t dirOffset;
+			char pad5[8];
+			uint64_t idOffset;
+			uint64_t dataOffset;
+		};
 
-struct FIdclEntry
-{
-	char pad[32];
-	uint64_t name;
-	char pad2[16];
-	uint64_t offset;
-	uint64_t compressedSize;
-	uint64_t size;
-	char pad3[64];
-};
+		struct FIdclEntry
+		{
+			char pad[32];
+			uint64_t name;
+			char pad2[16];
+			uint64_t offset;
+			uint64_t compressedSize;
+			uint64_t size;
+			char pad3[64];
+		};
 
-struct FIdclStringRef
-{
-	uint64_t type;
-	uint64_t name;
-};
+		struct FIdclStringRef
+		{
+			uint64_t type;
+			uint64_t name;
+		};
+	};
+
+	struct C : B
+	{
+		struct FIdclHeader
+		{
+			char magic[4];
+			uint32_t version;
+			char pad[32];
+			uint32_t files;
+			char pas2[4];
+			uint32_t ids;
+			char pad3[20];
+			uint64_t stringTableOffset;
+			char pad4[8];
+			uint64_t dirOffset;
+			char pad5[8];
+			uint64_t idOffset;
+			uint64_t dataOffset;
+		};
+	};
+}
 #pragma pack(pop)
 
 struct FIdclLump : public FResourceLump
@@ -125,6 +151,7 @@ struct FIdclLump : public FResourceLump
 	}
 };
 
+template<typename Ver>
 class FIdclFile : public FResourceFile
 {
 	std::unique_ptr<FIdclLump[]> Lumps;
@@ -135,16 +162,17 @@ public:
 	bool Open(bool quiet);
 };
 
-
-FIdclFile::FIdclFile(const char *filename, FileReader *file) : FResourceFile(filename, file)
+template<typename Ver>
+FIdclFile<Ver>::FIdclFile(const char *filename, FileReader *file) : FResourceFile(filename, file)
 {
 	NumLumps = 0;
 	Lumps = NULL;
 }
 
-bool FIdclFile::Open(bool quiet)
+template<typename Ver>
+bool FIdclFile<Ver>::Open(bool quiet)
 {
-	FIdclHeader header;
+	typename Ver::FIdclHeader header;
 
 	Reader->Read(&header, sizeof(header));
 	header.files = LittleLong(header.files);
@@ -175,14 +203,14 @@ bool FIdclFile::Open(bool quiet)
 		stringTable[i] = FString(&stringTableBuffer[stringOffsets[i]]);
 
 	// Read file ids
-	auto fileIds = std::make_unique<FIdclStringRef[]>(header.files);
+	auto fileIds = std::make_unique<typename Ver::FIdclStringRef[]>(header.files);
 	Reader->Seek(header.idOffset + header.ids*4, SEEK_SET);
-	Reader->Read(fileIds.get(), header.files*sizeof(FIdclStringRef));
+	Reader->Read(fileIds.get(), header.files*sizeof(typename Ver::FIdclStringRef));
 
 	// Read directory
-	auto dirEntries = std::make_unique<FIdclEntry[]>(header.files);
+	auto dirEntries = std::make_unique<typename Ver::FIdclEntry[]>(header.files);
 	Reader->Seek(header.dirOffset, SEEK_SET);
-	Reader->Read(dirEntries.get(), header.files*sizeof(FIdclEntry));
+	Reader->Read(dirEntries.get(), header.files*sizeof(typename Ver::FIdclEntry));
 
 	Lumps = std::make_unique<FIdclLump[]>(header.files+1);
 	for(uint64_t i = 0;i < header.files;++i)
@@ -225,9 +253,18 @@ FResourceFile *CheckIdcl(const char *filename, FileReader *file, bool quiet)
 		file->Read(&magic, 8);
 		file->Seek(0, SEEK_SET);
 
+		// The B version seems to indicate alternate translation? All the
+		// English files and standard resources are C.
 		if(!memcmp(magic, "IDCL\xC\x0\x0\x0", 8))
 		{
-			FResourceFile *rf = new FIdclFile(filename, file);
+			FResourceFile *rf = new FIdclFile<IDCL::C>(filename, file);
+			if(rf->Open(quiet)) return rf;
+			rf->Reader = NULL; // to avoid destruction of reader
+			delete rf;
+		}
+		else if(!memcmp(magic, "IDCL\xB\x0\x0\x0", 8))
+		{
+			FResourceFile *rf = new FIdclFile<IDCL::B>(filename, file);
 			if(rf->Open(quiet)) return rf;
 			rf->Reader = NULL; // to avoid destruction of reader
 			delete rf;

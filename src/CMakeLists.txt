@@ -13,6 +13,7 @@ add_executable(wolfstoneextract
 	file_idcl.cpp
 	files.cpp
 	filesys_steam.cpp
+	filesys.cpp
 	main.cpp
 	resourcefile.cpp
 	scanner.cpp
