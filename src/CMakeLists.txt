@@ -17,9 +17,10 @@ add_executable(wolfstoneextract
 	main.cpp
 	resourcefile.cpp
 	scanner.cpp
+	soundbank.cpp
 	zstring.cpp
 )
 
 set_target_properties(wolfstoneextract PROPERTIES CXX_STANDARD 17)
 
-target_link_libraries(wolfstoneextract ooz)
+target_link_libraries(wolfstoneextract ooz ww2ogg)

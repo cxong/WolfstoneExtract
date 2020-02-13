@@ -305,9 +305,15 @@ FString File::getInsensitiveFile(const FString &filename, bool sensitiveExtensio
 #endif
 }
 
-bool File::makeDir() const
+bool File::makeDir()
 {
-	return FileSys::CreateDirectoryIfNeeded(getPath());
+	if(FileSys::CreateDirectoryIfNeeded(getPath()))
+	{
+		directory = true;
+		existing = true;
+		return true;
+	}
+	return false;
 }
 
 /**

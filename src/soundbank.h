@@ -1,8 +1,8 @@
 /*
-** filesys.h
+** soundbank.h
 **
 **---------------------------------------------------------------------------
-** Copyright 2011 Braden Obrzut
+** Copyright 2020 Braden Obrzut
 ** All rights reserved.
 **
 ** Redistribution and use in source and binary forms, with or without
@@ -32,48 +32,25 @@
 **
 */
 
-#ifndef __FILESYS_H__
-#define __FILESYS_H__
+#pragma once
 
 #include "tarray.h"
-#include "zstring.h"
 
-#ifdef _WIN32
-#define PATH_SEPARATOR "\\"
-#else
-#define PATH_SEPARATOR "/"
-#endif
+#include <cstdint>
+#include <memory>
 
-class File
+class FileReader;
+
+struct FSoundbank
 {
-	public:
-		File() : directory(false), existing(false), writable(false) {}
-		File(const FString &filename);
-		File(const File &dir, const FString &filename);
-		~File() {}
+	struct Entry
+	{
+		uint64_t Offset;
+		uint32_t Length;
+		TArray<uint8_t> Data;
+	};
 
-		bool					exists() const { return existing; }
-		FString					getDirectory() const;
-		FString					getFileName() const;
-		const TArray<FString>	&getFileList() const { return files; }
-		FString					getInsensitiveFile(const FString &filename, bool sensitiveExtension) const;
-		FString					getPath() const { return filename; }
-		bool					isDirectory() const { return directory; }
-		bool					isFile() const { return !directory; }
-		bool					isWritable() const { return writable; }
-		bool					makeDir();
-		FILE					*open(const char* mode) const;
-		bool					remove();
+	FSoundbank(FileReader *reader);
 
-	protected:
-		void					init(FString filename);
-
-		FString	filename;
-
-		TArray<FString>	files;
-		bool			directory;
-		bool			existing;
-		bool			writable;
+	TArray<Entry> Sounds;
 };
-
-#endif /* __FILESYS_H__ */

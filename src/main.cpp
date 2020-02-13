@@ -3,6 +3,7 @@
 #include "filesys_steam.h"
 #include "filesys.h"
 #include "resourcefile.h"
+#include "soundbank.h"
 #include "zstring.h"
 
 #include <array>
@@ -19,7 +20,21 @@ struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
 {
 	using std::vector<std::unique_ptr<FResourceFile>>::vector;
 
-	void addIn(ResourceCollection &&other)
+	FResourceLump *Find(FString name) const
+	{
+		for(auto iter = rbegin(); iter != rend(); ++iter)
+		{
+			for(unsigned int i = 0; i < (*iter)->LumpCount(); ++i)
+			{
+				auto lump = (*iter)->GetLump(i);
+				if(lump->FullName.Compare(name) == 0)
+					return lump;
+			}
+		}
+		return nullptr;
+	}
+
+	void AddIn(ResourceCollection &&other)
 	{
 		for(auto &res : other)
 			emplace_back(std::move(res));
@@ -138,8 +153,8 @@ static ResourceCollection LoadResources(FString basePath, const std::vector<FStr
 {
 	ResourceCollection ret;
 
-	ret.addIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR "chunk_4.resources"));
-	ret.addIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR + soundsPath + PATH_SEPARATOR "sound.pack"));
+	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR "chunk_4.resources"));
+	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR + soundsPath + PATH_SEPARATOR "sound.pack"));
 
 	for(auto lang : languages)
 	{
@@ -155,7 +170,7 @@ static ResourceCollection LoadResources(FString basePath, const std::vector<FStr
 			}
 		}
 
-		ret.addIn(std::move(collection));
+		ret.AddIn(std::move(collection));
 	}
 	return ret;
 }
@@ -180,22 +195,55 @@ static void Extract(FString language)
 
 	auto resFiles = LoadResources(wolf2path, languages);
 
-	printf("Extracting...\n");
-	for(auto const& res : resFiles)
-	{
-		for(uint32_t i = 0;i < res->LumpCount();++i)
+	const auto ExtractDatafile = [&resFiles](FString name) {
+		auto lump = resFiles.Find(name);
+
+		if(auto f = File(lump->FullName).open("w"))
 		{
-			auto lump = res->GetLump(i);
-
-			if(!File(File(lump->FullName).getDirectory()).makeDir())
-				throw CFatalError("Could not create directory for writing out file.");
-
-			auto f = fopen(lump->FullName, "w");
 			auto cache = lump->CacheLump();
 			fwrite(cache, lump->LumpSize, 1, f);
 			fclose(f);
 		}
-	}
+		else
+			throw CFatalError("Couldn't open file for writing");
+	};
+
+	const auto ExtractSoundbank = [&resFiles](FString bnkName) {
+		FString dirName = bnkName;
+		dirName.Substitute('/', '_');
+		File dir(dirName);
+		if(dir.exists() && !dir.isDirectory())
+			throw CFatalError("File exists matching sound bank name.");
+		dir.makeDir();
+
+		auto lump = resFiles.Find(bnkName);
+		std::unique_ptr<FileReader> reader{lump->NewReader()};
+		FSoundbank bnk(reader.get());
+
+		for(unsigned int i = 0; i < bnk.Sounds.Size(); ++i)
+		{
+			char name[32];
+			snprintf(name, 32, "snd%05u.ogg", i);
+			if(auto f = File(dir, name).open("w"))
+			{
+				fwrite(&bnk.Sounds[i].Data[0], bnk.Sounds[i].Length, 1, f);
+				fclose(f);
+			}
+			else
+				throw CFatalError("Couldn't open file for writing");
+		}
+	};
+
+	printf("Extracting...\n");
+	ExtractDatafile("gamemaps.wl6");
+	ExtractDatafile("maphead.wl6");
+	ExtractDatafile("vgadict.wl6");
+	ExtractDatafile("vgahead.wl6");
+	ExtractDatafile("vgagraph.wl6");
+	ExtractDatafile("vswap.wl6");
+	ExtractSoundbank("sb_wolfstone.bnk");
+	for(auto lang : languages)
+		ExtractSoundbank(lang + "/sb_vo_wolfstone.bnk");
 }
 
 static Options ParseOptions(int argc, const char* const * argv)
