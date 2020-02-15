@@ -108,9 +108,10 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *baseSoun
 // As of 2020-02-12 installing as Simplified Chinese will install all of the
 // language voices.  Traditional Chinese, Polish, and of course English only
 // install the English voices.  The rest install English and their respective
-// language.  Although the Simplified Chinese install only provides the patched
-// files English, the Wolfstone voices are untouched so it's recommended for a
-// complete dump.
+// language.  Interesting Simplified Chinese only provides the patched files
+// for English.  Ultimately none of this matters since despite some differences
+// in how the data is ordered the actual sounds are identical in all of the
+// languages.
 static std::vector<FString> DetectLanguages(FString basePath)
 {
 	File soundsDir(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR + soundsPath);
@@ -197,14 +198,16 @@ static ResourceCollection LoadPatchedResource(File file)
 	return resFiles;
 }
 
-static ResourceCollection LoadResources(FString basePath, const std::vector<FString> &languages)
+static ResourceCollection LoadResources(FString basePath, FString lang)
 {
 	ResourceCollection ret;
 
 	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR "chunk_4.resources"));
 	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR + soundsPath + PATH_SEPARATOR "sound.pack"));
 
-	for(auto lang : languages)
+	// At one point I tried to load all the language packs, but found all the
+	// sounds to be identical so no point.  No harm in keeping the extra code
+	// to support multiple languages around though.
 	{
 		auto collection = LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR + soundsPath + PATH_SEPARATOR + lang + ".pack");
 
@@ -237,11 +240,22 @@ static void Extract(FString language)
 	if(language.IsEmpty())
 		language = languages[0];
 
-	printf("Found languages (* = default):\n");
+	printf("Found languages (desired = %s):\n", language.GetChars());
+	bool foundDesiredLanguage = false;
 	for(auto l : languages)
-		printf("  %c %s\n", l.Compare(language) == 0 ? '*' : '-', l.GetChars());
+	{
+		if(l.Compare(language) == 0)
+			foundDesiredLanguage = true;
 
-	auto resFiles = LoadResources(wolf2path, languages);
+		printf("  - %s\n", l.GetChars());
+	}
+
+	if(!foundDesiredLanguage)
+		throw CFatalError("Could not detect desired language pack");
+
+	printf("\nNOTE: Sounds in all languages are identical. Multi-language support in this program is purely academic.\n\n");
+
+	auto resFiles = LoadResources(wolf2path, language);
 
 	printf("Extracting...\n");
 
@@ -267,6 +281,8 @@ static void Extract(FString language)
 	}
 	else
 		throw CFatalError("Couldn't open output file for writing");
+
+	printf("Done!\n");
 }
 
 static Options ParseOptions(int argc, const char* const * argv)
