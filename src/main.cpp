@@ -79,7 +79,7 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *baseSoun
 	for(unsigned int i = 0; i < baseBank.Sounds.Size(); ++i)
 	{
 		char name[32];
-		snprintf(name, 32, "sounds/snd%05u.ogg", i);
+		snprintf(name, 32, "sounds/%08X.ogg", baseBank.Sounds[i].Id);
 		archive.AddFile(name, soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(baseBank.Sounds[i].Data))).get());
 	}
 
@@ -87,7 +87,7 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *baseSoun
 	for(unsigned int i = 0; i < langBank.Sounds.Size(); ++i)
 	{
 		char name[32];
-		snprintf(name, 32, "sounds/lang%04u.ogg", i);
+		snprintf(name, 32, "sounds/%08X.ogg", langBank.Sounds[i].Id);
 		archive.AddFile(name, soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(langBank.Sounds[i].Data))).get());
 	}
 
@@ -322,7 +322,7 @@ static Options ParseOptions(int argc, const char* const * argv)
 			if(i + it->args >= argc)
 				throw CFatalError("Command line switch takes arguments which are not present");
 
-			it->handler(opts, argv + i);
+			it->handler(opts, argv + i + 1);
 			argv += it->args;
 			i += it->args;
 		}

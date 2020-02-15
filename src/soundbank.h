@@ -48,6 +48,7 @@ struct FSoundbank
 	{
 		uint64_t Offset;
 		uint32_t Length;
+		uint32_t Id;
 		std::vector<uint8_t> Data;
 	};
 

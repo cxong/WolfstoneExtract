@@ -83,6 +83,50 @@ struct FSbData
 	constexpr static uint32_t Magic = MakeId('D','A','T','A');
 };
 
+struct FSbHirc
+{
+	constexpr static uint32_t Magic = MakeId('H','I','R','C');
+
+	uint32_t NumObjects;
+};
+
+struct FSbHircObject
+{
+	enum ObjType : uint8_t
+	{
+		TYPE_Sound = 2
+	};
+
+	ObjType Type;
+	uint32_t Length;
+	uint32_t Id;
+
+	// Not a fixed size structure
+	struct Sound
+	{
+		struct Embedded
+		{
+			uint32_t Offset;
+			uint32_t Length;
+			uint8_t IsVoice;
+		};
+		struct Streamed
+		{
+			uint8_t IsVoice;
+		};
+
+		char Unknown[4];
+		uint8_t Included;
+		uint32_t FileId;
+		uint32_t SourceId;
+		union
+		{
+			Embedded embed;
+			Streamed stream;
+		};
+	};
+};
+
 #pragma pack(pop)
 
 FSoundbank::FSoundbank(FileReader *reader)
@@ -111,9 +155,42 @@ FSoundbank::FSoundbank(FileReader *reader)
 	if(!dataChunk)
 		throw CRecoverableError("Could not locate sound data in bank");
 
+	auto hircChunk = chunkMap.CheckKey(FSbHirc::Magic);
+	if(!hircChunk)
+		throw CRecoverableError("Could not locate HIRC section in bank");
+
 	auto indexChunk = chunkMap.CheckKey(FSbIndex::Magic);
 	if(!indexChunk)
 		throw CRecoverableError("Could not locate bank index");
+
+	// Map WEM Ids to sound Ids which are constant across languages
+	TMap<uint32_t, uint32_t> wemToSoundId;
+
+	reader->Seek(hircChunk->Offset, SEEK_SET);
+	FSbHirc hirc;
+	reader->Read(&hirc, sizeof(hirc));
+	hirc.NumObjects = LittleLong(hirc.NumObjects);
+	for(unsigned int i = 0; i < hirc.NumObjects; ++i)
+	{
+		FSbHircObject obj;
+		reader->Read(&obj, sizeof(obj));
+		obj.Length = LittleLong(obj.Length);
+		obj.Id = LittleLong(obj.Id);
+
+		//printf("%u: Type = %d, Id = %X, Length = %u\n", i, obj.Type, obj.Id, obj.Length);
+		if(obj.Type == FSbHircObject::TYPE_Sound)
+		{
+			FSbHircObject::Sound sfx;
+			auto nread = reader->Read(&sfx, std::min<long>(sizeof(sfx), obj.Length-4));
+			sfx.FileId = LittleLong(sfx.FileId);
+			//printf(" - FileId: %X\n", sfx.Included, sfx.FileId);
+			wemToSoundId[sfx.FileId] = obj.Id;
+
+			reader->Seek(obj.Length-4-nread, SEEK_CUR);
+		}
+		else
+			reader->Seek(obj.Length-4, SEEK_CUR);
+	}
 
 	Sounds.Resize(indexChunk->Length/sizeof(FSbIndex));
 	reader->Seek(indexChunk->Offset, SEEK_SET);
@@ -126,9 +203,9 @@ FSoundbank::FSoundbank(FileReader *reader)
 		index.WemId = LittleLong(index.WemId);
 		index.Offset = LittleLong(index.Offset);
 		index.Length = LittleLong(index.Length);
-		//printf("%u: WemId = %u, Offset = %u, Length = %u\n", i, index.WemId, index.Offset, index.Length);
+		//printf("%u: WemId = %X, Offset = %u, Length = %u; Sound Id = %X\n", i, index.WemId, index.Offset, index.Length, wemToSoundId[index.WemId]);
 
-		Sounds[i] = {dataChunk->Offset + index.Offset, index.Length};
+		Sounds[i] = {dataChunk->Offset + index.Offset, index.Length, wemToSoundId[index.WemId]};
 	}
 
 	printf("Processing sound bank ");
