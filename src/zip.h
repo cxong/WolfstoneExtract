@@ -1,5 +1,5 @@
 /*
-** soundbank.h
+** zip.h
 **
 **---------------------------------------------------------------------------
 ** Copyright 2020 Braden Obrzut
@@ -34,24 +34,20 @@
 
 #pragma once
 
-#include "tarray.h"
+#include "mz_crc32.h"
+#include "zstring.h"
 
-#include <cstdint>
+#include <map>
 #include <memory>
 #include <vector>
 
-class FileReader;
+class FResourceLump;
 
-struct FSoundbank
+class FZip
 {
-	struct Entry
-	{
-		uint64_t Offset;
-		uint32_t Length;
-		std::vector<uint8_t> Data;
-	};
+	std::map<FString, FResourceLump*> Entries;
 
-	FSoundbank(FileReader *reader);
-
-	TArray<Entry> Sounds;
+public:
+	void AddFile(FString path, FResourceLump *data);
+	std::vector<uint8_t> Build() const;
 };

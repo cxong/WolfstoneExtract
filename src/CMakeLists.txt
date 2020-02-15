@@ -15,9 +15,11 @@ add_executable(wolfstoneextract
 	filesys_steam.cpp
 	filesys.cpp
 	main.cpp
+	mz_crc32.cpp
 	resourcefile.cpp
 	scanner.cpp
 	soundbank.cpp
+	zip.cpp
 	zstring.cpp
 )
 

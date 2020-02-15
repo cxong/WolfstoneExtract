@@ -126,6 +126,8 @@ FSoundbank::FSoundbank(FileReader *reader)
 		index.WemId = LittleLong(index.WemId);
 		index.Offset = LittleLong(index.Offset);
 		index.Length = LittleLong(index.Length);
+		//printf("%u: WemId = %u, Offset = %u, Length = %u\n", i, index.WemId, index.Offset, index.Length);
+
 		Sounds[i] = {dataChunk->Offset + index.Offset, index.Length};
 	}
 
@@ -137,24 +139,24 @@ FSoundbank::FSoundbank(FileReader *reader)
 
 		auto& sound = Sounds[i];
 
-		sound.Data.Resize(sound.Length);
+		sound.Data.resize(sound.Length);
 
 		reader->Seek(sound.Offset, SEEK_SET);
-		if(reader->Read(&sound.Data[0], sound.Length) != sound.Length)
+		if(reader->Read(sound.Data.data(), sound.Length) != sound.Length)
 		{
 			puts("");
 			throw CRecoverableError("Failed to read sound data");
 		}
 
 		// Convert to standard Vorbis
-		std::istringstream istream{{(const char*)&sound.Data[0], sound.Length}};
+		std::istringstream istream{{(const char*)sound.Data.data(), sound.Length}};
 		Wwise_RIFF_Vorbis decoder(istream, packed_codebooks_aoTuV_603, sizeof(packed_codebooks_aoTuV_603), false, false, kNoForcePacketFormat);
 
 		std::ostringstream ostream;
 		decoder.generate_ogg(ostream);
 
-		sound.Data.Resize(ostream.str().length());
-		memcpy(&sound.Data[0], ostream.str().data(), ostream.str().length());
+		sound.Data.resize(ostream.str().length());
+		memcpy(sound.Data.data(), ostream.str().data(), ostream.str().length());
 	}
 	puts("");
 }

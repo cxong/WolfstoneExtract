@@ -4,6 +4,7 @@
 #include "filesys.h"
 #include "resourcefile.h"
 #include "soundbank.h"
+#include "zip.h"
 #include "zstring.h"
 
 #include <array>
@@ -31,7 +32,7 @@ struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
 					return lump;
 			}
 		}
-		return nullptr;
+		throw CFatalError("Expected data file not found in resources");
 	}
 
 	void AddIn(ResourceCollection &&other)
@@ -45,6 +46,53 @@ struct Options
 {
 	FString Language;
 };
+
+// Creates ecwolf.wl6 data from the sound banks
+static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *baseSounds, FResourceLump *langSounds)
+{
+	struct MemoryLump : FResourceLump
+	{
+		std::vector<uint8_t> Buffer;
+
+		MemoryLump(std::vector<uint8_t> &&data) : Buffer(std::move(data))
+		{
+			LumpSize = Buffer.size();
+		}
+
+		int FillCache()
+		{
+			Cache = (char*)Buffer.data();
+			RefCount = -1;
+			return -1;
+		}
+	};
+
+	// We need to keep these around until we can make the FZip::Build call.
+	std::vector<std::unique_ptr<MemoryLump>> soundStorage;
+
+	FZip archive;
+
+	std::unique_ptr<FileReader> baseReader{baseSounds->NewReader()};
+	std::unique_ptr<FileReader> langReader{langSounds->NewReader()};
+
+	FSoundbank baseBank(baseReader.get());
+	for(unsigned int i = 0; i < baseBank.Sounds.Size(); ++i)
+	{
+		char name[32];
+		snprintf(name, 32, "sounds/snd%05u.ogg", i);
+		archive.AddFile(name, soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(baseBank.Sounds[i].Data))).get());
+	}
+
+	FSoundbank langBank(langReader.get());
+	for(unsigned int i = 0; i < langBank.Sounds.Size(); ++i)
+	{
+		char name[32];
+		snprintf(name, 32, "sounds/lang%04u.ogg", i);
+		archive.AddFile(name, soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(langBank.Sounds[i].Data))).get());
+	}
+
+	return std::make_unique<MemoryLump>(archive.Build());
+}
 
 // Returns a list of installed languages, so that we can extract them all
 // and gracefully handle non-English users which may not have English installed.
@@ -195,55 +243,30 @@ static void Extract(FString language)
 
 	auto resFiles = LoadResources(wolf2path, languages);
 
-	const auto ExtractDatafile = [&resFiles](FString name) {
-		auto lump = resFiles.Find(name);
-
-		if(auto f = File(lump->FullName).open("w"))
-		{
-			auto cache = lump->CacheLump();
-			fwrite(cache, lump->LumpSize, 1, f);
-			fclose(f);
-		}
-		else
-			throw CFatalError("Couldn't open file for writing");
-	};
-
-	const auto ExtractSoundbank = [&resFiles](FString bnkName) {
-		FString dirName = bnkName;
-		dirName.Substitute('/', '_');
-		File dir(dirName);
-		if(dir.exists() && !dir.isDirectory())
-			throw CFatalError("File exists matching sound bank name.");
-		dir.makeDir();
-
-		auto lump = resFiles.Find(bnkName);
-		std::unique_ptr<FileReader> reader{lump->NewReader()};
-		FSoundbank bnk(reader.get());
-
-		for(unsigned int i = 0; i < bnk.Sounds.Size(); ++i)
-		{
-			char name[32];
-			snprintf(name, 32, "snd%05u.ogg", i);
-			if(auto f = File(dir, name).open("w"))
-			{
-				fwrite(&bnk.Sounds[i].Data[0], bnk.Sounds[i].Length, 1, f);
-				fclose(f);
-			}
-			else
-				throw CFatalError("Couldn't open file for writing");
-		}
-	};
-
 	printf("Extracting...\n");
-	ExtractDatafile("gamemaps.wl6");
-	ExtractDatafile("maphead.wl6");
-	ExtractDatafile("vgadict.wl6");
-	ExtractDatafile("vgahead.wl6");
-	ExtractDatafile("vgagraph.wl6");
-	ExtractDatafile("vswap.wl6");
-	ExtractSoundbank("sb_wolfstone.bnk");
-	for(auto lang : languages)
-		ExtractSoundbank(lang + "/sb_vo_wolfstone.bnk");
+
+	auto ecwolfWl6 = BuildECWolfArchive(
+		resFiles.Find("sb_wolfstone.bnk"),
+		resFiles.Find(language + "/sb_vo_wolfstone.bnk")
+	);
+
+	FZip zip;
+	zip.AddFile("ecwolf.wl6", ecwolfWl6.get());
+	zip.AddFile("gamemaps.wl6", resFiles.Find("gamemaps.wl6"));
+	zip.AddFile("maphead.wl6", resFiles.Find("maphead.wl6"));
+	zip.AddFile("vgadict.wl6", resFiles.Find("vgadict.wl6"));
+	zip.AddFile("vgahead.wl6", resFiles.Find("vgahead.wl6"));
+	zip.AddFile("vgagraph.wl6", resFiles.Find("vgagraph.wl6"));
+	zip.AddFile("vswap.wl6", resFiles.Find("vswap.wl6"));
+
+	if(auto f = File("wolfstone.pk3").open("w"))
+	{
+		auto zipData = zip.Build();
+		fwrite(zipData.data(), zipData.size(), 1, f);
+		fclose(f);
+	}
+	else
+		throw CFatalError("Couldn't open output file for writing");
 }
 
 static Options ParseOptions(int argc, const char* const * argv)
