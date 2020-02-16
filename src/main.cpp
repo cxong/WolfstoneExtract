@@ -14,7 +14,130 @@
 #include <memory>
 #include <vector>
 
-const FString soundsPath = "sound" PATH_SEPARATOR "soundbanks" PATH_SEPARATOR "pc";
+static const FString soundsPath = "sound" PATH_SEPARATOR "soundbanks" PATH_SEPARATOR "pc";
+
+static const std::map<uint32_t, const char*> SoundNames = {
+	{0x00A7A4A8u, "DSSWITCH"},
+	{0x011D4829u, "DSMCHSTP"},
+	{0x015F0AC5u, "DSDOGDTH"},
+	{0x017BD4A2u, "DSMUTDTH"},
+	{0x02E7D2B6u, "DSENDBN2"},
+	{0x0310F041u, "DSFAKSIT"},
+	{0x03247F84u, "DSWALK1"},
+	{0x03CA7301u, "NAZI_RAP"},
+	{0x03F3872Cu, "DSPLDETH"},
+	{0x057E0D67u, "DSHITWAL"},
+	{0x05987A19u, "DSGRDFIR"},
+	{0x05BA1401u, "GETTHEM"},
+	{0x06A65B2Au, "DSGMOVER"},
+	{0x06AEF84Cu, "DSWALK2"},
+	{0x082A773Fu, "HEADACHE"},
+	{0x084EC4ECu, "DSSHTDOR"},
+	{0x08B07D1Cu, "DSDROPN"},
+	{0x0910C9CEu, "DSMVGUN1"},
+	// Actually VICTORS bpt used where NAZI_OMI is
+	{0x09C2AFBAu, "NAZI_OMI"},
+	{0x0A011B88u, "DSGDDTH5"},
+	{0x0A1A4A9Du, "DSGOOB"},
+	{0x0A3A2104u, "DSSSSIT"},
+	{0x0B5B0E79u, "DSDOGATK"},
+	{0x0C0E9104u, "DSSLCTWN"},
+	{0x0C0E9F24u, "DSNOITEM"},
+	{0x0C48B24Du, "SUSPENSE"},
+	{0x0C50AA50u, "ROSTER"},
+	{0x0D6ACAA5u, "SEARCHN"},
+	{0x0D83D8B5u, "DSFOODUP"},
+	{0x0DDB7AE3u, "DSHANSIT"},
+	{0x0E0894DFu, "TWELFTH"},
+	{0x0E0A7172u, "DSGRDSIT"},
+	{0x0E0B6F1Au, "DSFAKDTH"},
+	{0x0F3798CDu, "DSNAZPAI"},
+	{0x0FA36143u, "DSRLAUNC"},
+	{0x10B7A13Eu, "DSGDDTH4"},
+	{0x10FE10ACu, "DSHITSHI"},
+	// Actually HITLWLTZ but used where NAZI_NOR is
+	{0x11225254u, "NAZI_NOR"},
+	{0x11242DC5u, "DSFATSIT"},
+	{0x1167D12Cu, "DSPISTOL"},
+	{0x11BEF1F3u, "ENDLEVEL"},
+	{0x13708AD1u, "DSMGUN"},
+	{0x13BE4844u, "DSFATDTH"},
+	{0x13D5899Fu, "DSGDDTH1"},
+	{0x13F3E3EBu, "DSFART"},
+	{0x1463D500u, "DSDRCLS"},
+	{0x14FE3846u, "DSMVGUN2"},
+	{0x152B095Fu, "DSENDBN1"},
+	{0x15F2D059u, "DSSELECT"},
+	{0x160EE504u, "DSSCBDTH"},
+	{0x167ED112u, "DSCGUNUP"},
+	{0x17D122ADu, "URAHERO"},
+	{0x18020AD9u, "DSHANDTH"},
+	{0x18A2C485u, "PACMAN"},
+	{0x19CE1EB9u, "DSBNS1UP"},
+	{0x1A5EBDD3u, "DSPSHWAL"},
+	{0x1A6ADEEBu, "DSBOSSFR"},
+	{0x1AE7B296u, "DSBONUS4"},
+	{0x1B1D7751u, "DSGDDTH7"},
+	{0x1B5090CFu, "DSESCPRS"},
+	{0x1B66113Eu, "DSKNFSWG"},
+	{0x1B8BF20Bu, "DSGDDTH6"},
+	{0x1BEF5B1Du, "DSAMMOUP"},
+	{0x1EE17085u, "DSOFFDTH"},
+	{0x214D99C0u, "DSGETKEY"},
+	{0x21A6CFDEu, "DSPRC100"},
+	{0x21DA0A8Au, "DUNGEON"},
+	{0x222D92DAu, "DSSSDTH"},
+	{0x22F3B414u, "SALUTE"},
+	{0x23AB1329u, "ZEROHOUR"},
+	// Not sure on this one since there are many very similar sounds in Wolf3D.
+	// However, it doesn't matter much since this sound is unused.
+	{0x23AE4001u, "DSBOSSIT"},
+	{0x2479AADBu, "DSSCBATK"},
+	{0x24D870DFu, "DSMGUNUP"},
+	{0x24F7A979u, "DSBONUS3"},
+	{0x27067F95u, "DSGRTDTH"},
+	{0x27370765u, "DSHARTBT"},
+	{0x2761FCCBu, "DSPLPAIN"},
+	{0x28BB8C3Du, "DSOTOSIT"},
+	{0x295945DEu, "CORNER"},
+	{0x2B9C7F9Fu, "FUNKYOU"},
+	{0x2BDCCC72u, "DSSCBSIT"},
+	{0x2BFE167Au, "DSGDDTH2"},
+	{0x2C1F5DF3u, "DSMEDIUP"},
+	{0x2D077554u, "DSOFFSIT"},
+	{0x2E631A44u, "ULTIMATE"},
+	{0x2EFC91F9u, "DSSSFIRE"},
+	{0x2F9F663Fu, "PREGNANT"},
+	{0x306646D8u, "DSOTODTH"},
+	// This seems to be an extra sound. Not that it matters much since even
+	// BOSSIT isn't used. Judging by length this is one of non-Hans boss sounds.
+	{0x310FB57Bu, "DSBOSSI2"},
+	{0x31A2B52Fu, "POW"},
+	{0x31F30118u, "DSNOWAY"},
+	// Copy of DSGDDTH2 (although bytes differ bitstream is same). Probably here
+	// to complete the adlib sound table although it's never used.
+	{0x3223E805u, "DSGDDTH3"},
+	{0x34962C4Au, "DSBONUS2"},
+	// Actually VICMARCH but used where WARMARCH and INTROCW3 is
+	{0x34E37DC5u, "WARMARCH"},
+	{0x34FAC876u, "DSNAZIHT"},
+	{0x3570E2F0u, "DSGRTSIT"},
+	{0x3613AA1Du, "DSCGUN"},
+	{0x36AFEDDFu, "WONDERIN"},
+	{0x370A956Fu, "DSGDDTH8"},
+	{0x3893F45Fu, "DSFAKFIR"},
+	{0x39475108u, "DSSLCTIT"},
+	{0x39F47F3Eu, "DSSLURPE"},
+	{0x3A63EC71u, "DSHITSIT"},
+	{0x3B04E074u, "DSBONUS1"},
+	{0x3C3E5E47u, "DSNOTIN"},
+	{0x3D93D4EFu, "DSBAREXP"},
+	{0x3D9BF301u, "DSDOGSIT"},
+	{0x3DAEE1EAu, "GOINGAFT"},
+	{0x3DB6F9F4u, "DSYEAH"},
+	{0x3DEBD92Du, "DSNOBNS"},
+	{0x3ED3FE9Fu, "DSHITDTH"}
+};
 
 //using ResourceCollection = std::vector<std::unique_ptr<FResourceFile>>;
 struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
@@ -72,23 +195,33 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *baseSoun
 
 	FZip archive;
 
-	std::unique_ptr<FileReader> baseReader{baseSounds->NewReader()};
-	std::unique_ptr<FileReader> langReader{langSounds->NewReader()};
+	std::array<std::unique_ptr<FileReader>, 2> readers = {
+		std::unique_ptr<FileReader>{baseSounds->NewReader()},
+		std::unique_ptr<FileReader>{langSounds->NewReader()}
+	};
 
-	FSoundbank baseBank(baseReader.get());
-	for(unsigned int i = 0; i < baseBank.Sounds.Size(); ++i)
+	for(auto& reader : readers)
 	{
-		char name[32];
-		snprintf(name, 32, "sounds/%08X.ogg", baseBank.Sounds[i].Id);
-		archive.AddFile(name, soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(baseBank.Sounds[i].Data))).get());
-	}
+		FSoundbank bank(reader.get());
+		for(unsigned int i = 0; i < bank.Sounds.Size(); ++i)
+		{
+			uint32_t id = bank.Sounds[i].Id;
+			const char* sname = "";
+			if(auto value = SoundNames.find(id); value != SoundNames.end())
+				sname = value->second;
 
-	FSoundbank langBank(langReader.get());
-	for(unsigned int i = 0; i < langBank.Sounds.Size(); ++i)
-	{
-		char name[32];
-		snprintf(name, 32, "sounds/%08X.ogg", langBank.Sounds[i].Id);
-		archive.AddFile(name, soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(langBank.Sounds[i].Data))).get());
+			char name[32];
+			if(sname[0] != 0 && !(sname[0] == 'D' && sname[1] == 'S'))
+				snprintf(name, 32, "music/%s.ogg", sname);
+			else if(sname[0] != 0)
+				snprintf(name, 32, "sounds/%s.ogg", sname);
+			else
+			{
+				fprintf(stderr, "Sound %08X does not have a name assigned. This is probably a bug.\n", id);
+				snprintf(name, 32, "sounds/%08X.ogg", id);
+			}
+			archive.AddFile(name, soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(bank.Sounds[i].Data))).get());
+		}
 	}
 
 	return std::make_unique<MemoryLump>(archive.Build());
