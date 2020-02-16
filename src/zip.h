@@ -41,7 +41,7 @@
 #include <memory>
 #include <vector>
 
-class FResourceLump;
+struct FResourceLump;
 
 class FZip
 {

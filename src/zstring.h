@@ -39,6 +39,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <string>
 #include <utility>
 
 #ifdef _WIN32
@@ -117,9 +118,9 @@ public:
 	FString (char oneChar);
 	// This is intentionally #ifdef'd. The only code which needs this is parts of the Windows backend that receive Unicode text from the system.
 #ifdef _WIN32
-	explicit FString(const wchar_t *copyStr);
-	FString &operator = (const wchar_t *copyStr);
-	std::wstring WideString() const { return ::WideString(Chars); }
+	//explicit FString(const wchar_t *copyStr);
+	//FString &operator = (const wchar_t *copyStr);
+	//std::wstring WideString() const { return ::WideString(Chars); }
 #endif
 
 	// Concatenation constructors

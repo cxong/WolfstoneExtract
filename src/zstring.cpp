@@ -37,6 +37,7 @@
 #include <string.h>
 #include <new>		// for bad_alloc
 
+#include "tarray.h"
 #include "zstring.h"
 
 FNullStringData FString::NullString =
@@ -1147,6 +1148,7 @@ void FString::ReallocBuffer (size_t newlen)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#if 0
 // Convert from and to Windows wide strings so that we can interface with the Unicode version of the Windows API.
 FString::FString(const wchar_t *copyStr)
 {
@@ -1194,6 +1196,7 @@ std::wstring WideString(const char *cin)
 	buildbuffer.Push(0);
 	return std::wstring(buildbuffer.Data());
 }
+#endif
 
 static HANDLE StringHeap;
 const SIZE_T STRING_HEAP_SIZE = 64*1024;

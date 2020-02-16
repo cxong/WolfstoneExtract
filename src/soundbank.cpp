@@ -41,6 +41,7 @@
 #include "tarray.h"
 #include "zstring.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <packed_codebooks_aoTuV_603.h>

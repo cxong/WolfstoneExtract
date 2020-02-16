@@ -295,7 +295,7 @@ void FResourceFile::JunkLeftoverFilters(void *lumps, size_t lumpsize, uint32_t m
 		for (void *p = (uint8_t *)lumps + start * lumpsize; p < stop; p = (uint8_t *)p + lumpsize)
 		{
 			FResourceLump *lump = (FResourceLump *)p;
-			lump->FullName = 0;
+			lump->FullName = nullptr;
 			lump->Name[0] = '\0';
 			lump->Namespace = -1; // ns_hidden
 		}
