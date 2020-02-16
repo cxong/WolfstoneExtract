@@ -25,4 +25,4 @@ add_executable(wolfstoneextract
 
 set_target_properties(wolfstoneextract PROPERTIES CXX_STANDARD 17)
 
-target_link_libraries(wolfstoneextract ooz ww2ogg)
+target_link_libraries(wolfstoneextract ooz revorb ww2ogg)

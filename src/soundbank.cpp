@@ -44,6 +44,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <packed_codebooks_aoTuV_603.h>
+#include <revorb.h>
 #include <sstream>
 #include <wwriff.h>
 
@@ -229,8 +230,12 @@ FSoundbank::FSoundbank(FileReader *reader)
 		std::istringstream istream{{(const char*)sound.Data.data(), sound.Length}};
 		Wwise_RIFF_Vorbis decoder(istream, packed_codebooks_aoTuV_603, sizeof(packed_codebooks_aoTuV_603), false, false, kNoForcePacketFormat);
 
+		std::stringstream generatedStream;
+		decoder.generate_ogg(generatedStream);
+
 		std::ostringstream ostream;
-		decoder.generate_ogg(ostream);
+		if(!revorb(generatedStream, ostream))
+			throw CRecoverableError("Failed to rebuild granules");
 
 		sound.Data.resize(ostream.str().length());
 		memcpy(sound.Data.data(), ostream.str().data(), ostream.str().length());
