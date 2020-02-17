@@ -406,10 +406,14 @@ static void Extract(FString language)
 	zip.AddFile("vgagraph.wl6", resFiles.Find("vgagraph.wl6"));
 	zip.AddFile("vswap.wl6", resFiles.Find("vswap.wl6"));
 
-	if(auto f = File("wolfstone.pk3").open("w"))
+	if(auto f = File("wolfstone.pk3").open("wb"))
 	{
 		auto zipData = zip.Build();
-		fwrite(zipData.data(), zipData.size(), 1, f);
+		if(fwrite(zipData.data(), zipData.size(), 1, f) != 1)
+		{
+			fclose(f);
+			throw CFatalError("Failed to write file");
+		}
 		fclose(f);
 	}
 	else

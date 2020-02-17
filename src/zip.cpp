@@ -162,7 +162,7 @@ std::vector<uint8_t> FZip::Build() const
 		FDirectoryFile df;
 
 		fh.CSize = fh.USize = df.CSize = df.USize = lump->LumpSize;
-		fh.FileNameLength = df.FileNameLength = path.Len();
+		fh.FileNameLength = df.FileNameLength = uint16_t(path.Len());
 		df.Offset = offset;
 
 		offset += sizeof(FFileHeader) + fh.FileNameLength + fh.ExtraLength + fh.CSize;
@@ -172,12 +172,12 @@ std::vector<uint8_t> FZip::Build() const
 	}
 
 	FEndCentralDirectory ecd;
-	ecd.TotalEntries = ecd.CurDiskEntries = Entries.size();
+	ecd.TotalEntries = ecd.CurDiskEntries = uint16_t(Entries.size());
 	ecd.CentralDirectorySize = sizeof(FDirectoryFile)*ecd.TotalEntries + totalNamesLength;
 	ecd.CentralDirectoryOffset = offset;
 
 	std::vector<uint8_t> buffer;
-	buffer.resize(offset +  ecd.CentralDirectorySize + sizeof(FEndCentralDirectory));
+	buffer.resize(size_t(offset) + ecd.CentralDirectorySize + sizeof(FEndCentralDirectory));
 	uint8_t *dest = buffer.data();
 
 	// Second pass: Write out the file header/data
