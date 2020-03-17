@@ -71,6 +71,7 @@ if(INTERNAL_VORBIS)
 	target_link_libraries(vorbis PUBLIC Ogg::ogg)
 endif()
 
+add_subdirectory(idCrypt)
 add_subdirectory(ooz)
 add_subdirectory(revorb)
 add_subdirectory(ww2ogg)

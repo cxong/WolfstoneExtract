@@ -16,8 +16,11 @@ The other component to the game, sounds, are stored in AudioKinetic Wwise sound 
 
 The format of these sound banks is well known, and contains Vorbis data which just needs to be transformed into a standard Ogg Vorbis container.
 
+Text strings are stored in an encrypted and compressed text file in the base game resource file. See idCrypt for details on the encryption. In addition to what's stated there the files are Oodle compressed. So a four byte header needs to be stripped, the file decrypted, said header needs to be tacked back on, then finally decompressed.
+
 ## References
 
+* [idCrypt](https://github.com/emoose/DOOMExtract/tree/master/idCrypt)
 * [Ooz (Kraken)](https://github.com/powzix/ooz)
 * [Wwise sound bank extractor](https://github.com/eXpl0it3r/bnkextr)
 * [Wwise WEM to Ogg](https://github.com/hcs64/ww2ogg)
