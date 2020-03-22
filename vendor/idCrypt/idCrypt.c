@@ -27,7 +27,7 @@ int idCrypt(idCrypt_t* state, uint8_t* fileData, long size, const char* internal
 	else
 		gen_random(state->fileSalt, 0xC);
 
-	int res = hash_data((void*)state->fileSalt, 0xC, (void*)keyDeriveStatic, 0xA, internalPath, strlen(internalPath), NULL, 0, state->encKey);
+	int res = hash_data((void*)state->fileSalt, 0xC, (void*)keyDeriveStatic, 0xA, internalPath, (int)strlen(internalPath), NULL, 0, state->encKey);
 	if (!NT_SUCCESS(res))
 	{
 		state->errstatus = res;
@@ -50,7 +50,7 @@ int idCrypt(idCrypt_t* state, uint8_t* fileData, long size, const char* internal
 		fileText = fileData + 0x1C;
 		fileTextSize = size - 0x1C - 0x20;
 
-		uint8_t* fileHmac = fileData + (size - 0x20);
+		uint8_t* fileHmac = fileData + ((size_t)size - 0x20);
 
 		res = hash_data((void*)state->fileSalt, 0xC, (void*)state->fileIV, 0x10, (void*)fileText, fileTextSize, state->encKey, 0x20, state->hmac);
 		if (!NT_SUCCESS(res))

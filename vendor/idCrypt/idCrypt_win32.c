@@ -5,6 +5,8 @@
 
 #include <bcrypt.h>
 #include <ncrypt.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #define NT_SUCCESS(Status)          (((NTSTATUS)(Status)) >= 0)
 
