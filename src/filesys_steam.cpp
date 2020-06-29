@@ -217,17 +217,16 @@ static TArray<FString> ParseSteamRegistry(const char* path)
 }
 #endif
 
-FString GetSteamPath()
+FString GetSteamPath(ESteamApp game)
 {
-	constexpr int game = 0;
-
 	static struct SteamAppInfo
 	{
 		const char* const BasePath;
 		const int AppID;
-	} AppInfo[1] =
+	} AppInfo[NUM_STEAM_APPS] =
 	{
-		{"Wolfenstein.II.The.New.Colossus", 612880}
+		{"Wolfenstein.II.The.New.Colossus", 612880},
+		{"Wolfenstein Youngblood", 1056960}
 	};
 
 #if defined(_WIN32)
@@ -310,7 +309,7 @@ FString GetSteamPath()
 
 		for(unsigned int i = 0;i < SteamInstallFolders.Size();++i)
 		{
-			for(unsigned int app = 0;app < 1;++app)
+			for(unsigned int app = 0;app < NUM_STEAM_APPS;++app)
 			{
 				struct stat st;
 				FString candidate(SteamInstallFolders[i] + "/" + AppInfo[app].BasePath);

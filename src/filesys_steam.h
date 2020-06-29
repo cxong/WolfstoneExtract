@@ -4,5 +4,13 @@ class FString;
 
 namespace FileSys
 {
-	FString GetSteamPath();
+	enum ESteamApp
+	{
+		APP_WolfensteinII,
+		APP_WolfensteinYoungblood,
+
+		NUM_STEAM_APPS
+	};
+
+	FString GetSteamPath(ESteamApp game);
 }

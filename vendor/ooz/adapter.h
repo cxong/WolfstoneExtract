@@ -21,7 +21,7 @@ constexpr unsigned char _BitScanReverse(unsigned long * Index, unsigned long Mas
 constexpr unsigned char _BitScanForward(unsigned long * Index, unsigned long Mask) {
   if(Mask == 0)
     return 1;
-  *Index = 31 - __builtin_ctz(Mask);
+  *Index = __builtin_ctz(Mask);
   return 0;
 }
 

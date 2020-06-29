@@ -144,7 +144,7 @@ struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
 {
 	using std::vector<std::unique_ptr<FResourceFile>>::vector;
 
-	FResourceLump *Find(FString name) const
+	FResourceLump *Check(FString name) const
 	{
 		for(auto iter = rbegin(); iter != rend(); ++iter)
 		{
@@ -155,6 +155,13 @@ struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
 					return lump;
 			}
 		}
+		return nullptr;
+	}
+
+	FResourceLump *Find(FString name) const
+	{
+		if(FResourceLump *lump = Check(name))
+			return lump;
 		throw CFatalError("Expected data file not found in resources");
 	}
 
@@ -170,8 +177,18 @@ struct Options
 	FString Language;
 };
 
+struct GameInfo
+{
+	FileSys::ESteamApp App;
+	const char* Name;
+	const char* Game;
+	const char* OutputName;
+	ResourceCollection (*LoadResources)(FString, FString);
+};
+
 // Creates ecwolf.wl6 data from the sound banks
-static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *baseSounds, FResourceLump *langSounds)
+template<typename ... T> // T should be FResourceLump but C++ doesn't have a nice way to represent that
+static std::unique_ptr<FResourceLump> BuildECWolfArchive(T* ... soundResource)
 {
 	struct MemoryLump : FResourceLump
 	{
@@ -195,9 +212,8 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *baseSoun
 
 	FZip archive;
 
-	std::array<std::unique_ptr<FileReader>, 2> readers = {
-		std::unique_ptr<FileReader>{baseSounds->NewReader()},
-		std::unique_ptr<FileReader>{langSounds->NewReader()}
+	auto readers = std::array<std::unique_ptr<FileReader>, sizeof...(soundResource)>{
+		std::unique_ptr<FileReader>{soundResource->NewReader()}...
 	};
 
 	for(auto& reader : readers)
@@ -279,6 +295,8 @@ static ResourceCollection LoadPatchedResource(File file)
 	auto patchPattern = file.getFileName();
 	if(patchPattern.Compare("gameresources.resources") == 0)
 		patchPattern = "patch_([0-9]+).resources";
+	else if(patchPattern.Compare("gameresources_pc.resources") == 0)
+		patchPattern = "patch_([0-9]+)_pc.resources";
 	else
 	{
 		patchPattern.Substitute("(", "\\(");
@@ -316,7 +334,7 @@ static ResourceCollection LoadPatchedResource(File file)
 	for(auto const& res : fileList)
 	{
 		printf("Loading %s", res.getFileName().GetChars());
-		auto rf = FResourceFile::OpenResourceFile(file.getPath(), nullptr);
+		auto rf = FResourceFile::OpenResourceFile(res.getPath(), nullptr);
 		if(!rf)
 		{
 			printf(", missing\n");
@@ -331,43 +349,55 @@ static ResourceCollection LoadPatchedResource(File file)
 	return resFiles;
 }
 
-static ResourceCollection LoadResources(FString basePath, FString lang)
+static void LoadSoundbanks(FString basePath, FString lang, ResourceCollection &ret)
 {
-	ResourceCollection ret;
-
-	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR "chunk_4.resources"));
 	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR + soundsPath + PATH_SEPARATOR "sound.pack"));
 
 	// At one point I tried to load all the language packs, but found all the
 	// sounds to be identical so no point.  No harm in keeping the extra code
 	// to support multiple languages around though.
+	auto collection = LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR + soundsPath + PATH_SEPARATOR + lang + ".pack");
+
+	// Deconflict the various languages that may be loaded.
+	for(auto &rf : collection)
 	{
-		auto collection = LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR + soundsPath + PATH_SEPARATOR + lang + ".pack");
-
-		// Deconflict the various languages that may be loaded.
-		for(auto &rf : collection)
+		for(unsigned int i = 0; i < rf->LumpCount(); ++i)
 		{
-			for(unsigned int i = 0; i < rf->LumpCount(); ++i)
-			{
-				auto lump = rf->GetLump(i);
-				lump->LumpNameSetup(lang + "/" + lump->FullName);
-			}
+			auto lump = rf->GetLump(i);
+			lump->LumpNameSetup(lang + "/" + lump->FullName);
 		}
-
-		ret.AddIn(std::move(collection));
 	}
+
+	ret.AddIn(std::move(collection));
+}
+
+static ResourceCollection LoadWolfensteinIIResources(FString basePath, FString lang)
+{
+	ResourceCollection ret;
+
+	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR "gameresources.resources"));
+	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR "chunk_4.resources"));
+
+	LoadSoundbanks(basePath, lang, ret);
 	return ret;
 }
 
-static void Extract(FString language)
+static ResourceCollection LoadYoungbloodResources(FString basePath, FString lang)
 {
-	auto wolf2path = FileSys::GetSteamPath();
-	if(wolf2path.IsEmpty())
-		throw CFatalError("Could not find installed Wolfenstein II game data.");
+	ResourceCollection ret;
 
-	printf("Wolfenstein II path: %s\n", wolf2path.GetChars());
+	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR "chunk_8_pc.resources"));
 
-	auto languages = DetectLanguages(wolf2path);
+	// One of the patches not associated with chunk_8_pc has the updated vgagraph
+	ret.AddIn(LoadPatchedResource(basePath + PATH_SEPARATOR "base" PATH_SEPARATOR "gameresources_pc.resources"));
+
+	LoadSoundbanks(basePath, lang, ret);
+	return ret;
+}
+
+static void Extract(GameInfo game, FString wolfpath, FString language)
+{
+	auto languages = DetectLanguages(wolfpath);
 
 	// Default to first available language if one isn't specified.
 	if(language.IsEmpty())
@@ -388,14 +418,16 @@ static void Extract(FString language)
 
 	printf("\nNOTE: Sounds in all languages are identical. Multi-language support in this program is purely academic.\n\n");
 
-	auto resFiles = LoadResources(wolf2path, language);
+	auto resFiles = game.LoadResources(wolfpath, language);
 
-	printf("Extracting...\n");
+	printf("Extracting %s...\n", game.Game);
 
-	auto ecwolfWl6 = BuildECWolfArchive(
-		resFiles.Find("sb_wolfstone.bnk"),
-		resFiles.Find(language + "/sb_vo_wolfstone.bnk")
-	);
+	auto ecwolfWl6 = game.App == FileSys::APP_WolfensteinII
+		? BuildECWolfArchive(
+			resFiles.Find("sb_wolfstone.bnk"),
+			resFiles.Find(language + "/sb_vo_wolfstone.bnk")
+		)
+		: BuildECWolfArchive(resFiles.Find(language + "/wolfstone.bnk"));
 
 	FZip zip;
 	zip.AddFile("ecwolf.wl6", ecwolfWl6.get());
@@ -406,7 +438,21 @@ static void Extract(FString language)
 	zip.AddFile("vgagraph.wl6", resFiles.Find("vgagraph.wl6"));
 	zip.AddFile("vswap.wl6", resFiles.Find("vswap.wl6"));
 
-	if(auto f = File("wolfstone.pk3").open("wb"))
+	switch(game.App)
+	{
+	case FileSys::APP_WolfensteinII:
+		zip.AddFile("language.bfile", resFiles.Find("strings/english.lang"));
+		break;
+	case FileSys::APP_WolfensteinYoungblood:
+		zip.AddFile("demo0.wl6", resFiles.Find("demo0.wl6"));
+		zip.AddFile("demo1.wl6", resFiles.Find("demo1.wl6"));
+		zip.AddFile("demo2.wl6", resFiles.Find("demo2.wl6"));
+		zip.AddFile("demo3.wl6", resFiles.Find("demo3.wl6"));
+		zip.AddFile("language.json", resFiles.Find("strings/english.json"));
+		break;
+	}
+
+	if(auto f = File(game.OutputName).open("wb"))
 	{
 		auto zipData = zip.Build();
 		if(fwrite(zipData.data(), zipData.size(), 1, f) != 1)
@@ -420,6 +466,58 @@ static void Extract(FString language)
 		throw CFatalError("Couldn't open output file for writing");
 
 	printf("Done!\n");
+}
+
+static std::tuple<GameInfo, FString> PickGame()
+{
+	constexpr std::array<GameInfo, FileSys::NUM_STEAM_APPS> GameInfoTable
+	{
+		GameInfo{FileSys::APP_WolfensteinII, "Wolfenstein II", "Wolfstone 3D", "wolfstone.pk3", LoadWolfensteinIIResources},
+		GameInfo{FileSys::APP_WolfensteinYoungblood, "Wolfenstein: Youngblood", "Elite Hans: Die Neue Ordnung", "elitehans.pk3", LoadYoungbloodResources}
+	};
+
+	TArray<std::tuple<GameInfo, FString>> candidates;
+	for(GameInfo game : GameInfoTable)
+	{
+		auto path = FileSys::GetSteamPath(game.App);
+		if(path.IsNotEmpty())
+			candidates.Push({game, path});
+	}
+
+	if(candidates.Size() == 0)
+		throw CFatalError("Could not find installed Wolfenstein II or Youngblood game data.");
+
+	int selection = 0;
+
+	if(candidates.Size() > 1)
+	{
+		printf("Select game to extract (0 to exit):\n");
+		int i = 1;
+		for(int i = 0; i < candidates.Size(); ++i)
+			printf("    %d: %s\n", i+1, std::get<0>(candidates[i]).Game);
+
+		for(;;)
+		{
+			printf("? ");
+			fflush(stdout);
+			selection = getchar() - '1';
+			if(selection == -1)
+				throw CNoRunExit();
+
+			if(selection >= 0 && selection < candidates.Size())
+				break;
+
+			// Flush any remaining input for the line
+			while(getchar() != '\n')
+			{
+				if(feof(stdin))
+					throw CNoRunExit();
+			}
+		}
+	}
+
+	printf("%s path: %s\n", std::get<0>(candidates[selection]).Name, std::get<1>(candidates[selection]).GetChars());
+	return candidates[selection];
 }
 
 static Options ParseOptions(int argc, const char* const * argv)
@@ -504,12 +602,15 @@ int main(int argc, char* argv[])
 	{
 		auto opts = ParseOptions(argc, argv);
 
-		Extract(opts.Language);
+		auto [ game, path ] = PickGame();
+		Extract(game, path, opts.Language);
 	}
+	catch(CNoRunExit&) {}
 	catch(CDoomError &error)
 	{
 		fprintf(stderr, "\nFAILED: %s\n", error.GetMessage());
 		return 1;
 	}
+
 	return 0;
 }

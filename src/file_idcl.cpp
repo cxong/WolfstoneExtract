@@ -35,6 +35,7 @@
 **
 */
 
+#include "doomerrors.h"
 #include "resourcefile.h"
 
 #include <algorithm>
@@ -74,7 +75,9 @@ namespace IDCL
 			uint64_t offset;
 			uint64_t compressedSize;
 			uint64_t size;
-			char pad3[64];
+			char pad3[24];
+			uint32_t typeIndicator; // Don't know, but seems to tell something about the file encoding
+			char pad4[36];
 		};
 
 		struct FIdclStringRef
@@ -143,7 +146,8 @@ struct FIdclLump : public FResourceLump
 		{
 			auto cdata = std::make_unique<uint8_t[]>(CompressedSize);
 			Owner->Reader->Read(cdata.get(), CompressedSize);
-			Kraken_Decompress(cdata.get(), CompressedSize, (uint8_t*)Cache, LumpSize);
+			if(Kraken_Decompress(cdata.get(), CompressedSize, (uint8_t*)Cache, LumpSize) < 0)
+				throw CFatalError("Kraken decompression failed.");
 		}
 
 		RefCount = 1;
@@ -191,8 +195,8 @@ bool FIdclFile<Ver>::Open(bool quiet)
 	Reader->Read(stringOffsets.get(), numStringTableEntries*sizeof(uint64_t));
 
 	// Read string table
-	uint64_t strBufLen = stringOffsets[0];
-	for(uint64_t i = 1;i < numStringTableEntries;++i)
+	uint64_t strBufLen = 0;
+	for(uint64_t i = 0;i < numStringTableEntries;++i)
 		strBufLen = std::max(strBufLen, stringOffsets[i]);
 	strBufLen += 1024; // Read enough extra to hopefully get the last string
 	auto stringTableBuffer = std::make_unique<char[]>(strBufLen);
@@ -222,16 +226,39 @@ bool FIdclFile<Ver>::Open(bool quiet)
 		dirEntries[i].offset = LittleLongLong(dirEntries[i].offset);
 		dirEntries[i].compressedSize = LittleLongLong(dirEntries[i].compressedSize);
 		dirEntries[i].size = LittleLongLong(dirEntries[i].size);
+		dirEntries[i].typeIndicator = LittleLong(dirEntries[i].typeIndicator);
+
+		// Seemingly uncompressed entry could be compressed if typeIndicator is
+		// 4, but the sizes will be in the header of the data.
+		if(dirEntries[i].typeIndicator == 4 && dirEntries[i].compressedSize == dirEntries[i].size)
+		{
+			Reader->Seek(dirEntries[i].offset, SEEK_SET);
+			Reader->Read(&dirEntries[i].size, 8);
+			Reader->Read(&dirEntries[i].compressedSize, 8);
+
+			dirEntries[i].offset += 16;
+			dirEntries[i].compressedSize = LittleLongLong(dirEntries[i].compressedSize);
+			dirEntries[i].size = LittleLongLong(dirEntries[i].size);
+
+			// compressedSize of -1 means uncompressed
+			if(dirEntries[i].compressedSize == std::numeric_limits<uint64_t>::max())
+				dirEntries[i].compressedSize = dirEntries[i].size;
+		}
 
 		FString name = stringTable[fileIds[i].name];
 		if(name.Right(4).Compare(".wl6") == 0 ||
 			name.Right(19).Compare("sb_vo_wolfstone.bnk") == 0 ||
-			name.Right(16).Compare("sb_wolfstone.bnk") == 0)
+			name.Right(16).Compare("sb_wolfstone.bnk") == 0 ||
+			name.Right(13).Compare("wolfstone.bnk") == 0 ||
+			name.Left(8).Compare("strings/") == 0)
 		{
 			FIdclLump &lump = Lumps[NumLumps++];
 
 			// Get rid of the path since we're only loading the embedded Wolf3D data
-			lump.LumpNameSetup(name.Mid(name.LastIndexOf('/')+1));
+			FString realName = name.Mid(name.LastIndexOf('/')+1);
+			if(name.Left(8).Compare("strings/") == 0)
+				realName = name;
+			lump.LumpNameSetup(realName);
 			lump.Owner = this;
 			lump.LumpSize = dirEntries[i].size;
 			lump.CompressedSize = dirEntries[i].compressedSize;
@@ -255,7 +282,7 @@ FResourceFile *CheckIdcl(const char *filename, FileReader *file, bool quiet)
 
 		// The B version seems to indicate alternate translation? All the
 		// English files and standard resources are C.
-		if(!memcmp(magic, "IDCL\xC\x0\x0\x0", 8))
+		if(!memcmp(magic, "IDCL\xC\x0\x0\x0", 8) || !memcmp(magic, "IDCL\xD\x0\x0\x0", 8))
 		{
 			FResourceFile *rf = new FIdclFile<IDCL::C>(filename, file);
 			if(rf->Open(quiet)) return rf;

@@ -4185,13 +4185,14 @@ enum {
 bool arg_stdout, arg_force, arg_quiet, arg_dll;
 int arg_compressor = kCompressor_Kraken, arg_level = 4;
 char arg_direction;
-char *verifyfolder;
+const char *verifyfolder;
 
 int ParseCmdLine(int argc, char *argv[]) {
   int i;
   // parse command line
   for (i = 1; i < argc; i++) {
-    char *s = argv[i], c;
+    const char *s = argv[i];
+	char c;
     if (*s != '-')
       break;
     if (*++s == '-') {
