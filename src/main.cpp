@@ -186,27 +186,27 @@ struct GameInfo
 	ResourceCollection (*LoadResources)(FString, FString);
 };
 
+struct MemoryLump : FResourceLump
+{
+	std::vector<uint8_t> Buffer;
+
+	MemoryLump(std::vector<uint8_t> &&data) : Buffer(std::move(data))
+	{
+		LumpSize = Buffer.size();
+	}
+
+	int FillCache()
+	{
+		Cache = (char*)Buffer.data();
+		RefCount = -1;
+		return -1;
+	}
+};
+
 // Creates ecwolf.wl6 data from the sound banks
 template<typename ... T> // T should be FResourceLump but C++ doesn't have a nice way to represent that
 static std::unique_ptr<FResourceLump> BuildECWolfArchive(T* ... soundResource)
 {
-	struct MemoryLump : FResourceLump
-	{
-		std::vector<uint8_t> Buffer;
-
-		MemoryLump(std::vector<uint8_t> &&data) : Buffer(std::move(data))
-		{
-			LumpSize = Buffer.size();
-		}
-
-		int FillCache()
-		{
-			Cache = (char*)Buffer.data();
-			RefCount = -1;
-			return -1;
-		}
-	};
-
 	// We need to keep these around until we can make the FZip::Build call.
 	std::vector<std::unique_ptr<MemoryLump>> soundStorage;
 
@@ -241,6 +241,17 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(T* ... soundResource)
 	}
 
 	return std::make_unique<MemoryLump>(archive.Build());
+}
+
+// Creates language.txt from strings data
+static std::unique_ptr<FResourceLump> BuildLanguage(FResourceLump *langLump)
+{
+	// TODO: Actually implement this
+	std::vector<uint8_t> data;
+	data.resize(langLump->LumpSize);
+	memcpy(data.data(), langLump->CacheLump(), langLump->LumpSize);
+	langLump->ReleaseCache();
+	return std::make_unique<MemoryLump>(std::move(data));
 }
 
 // Returns a list of installed languages, so that we can extract them all
@@ -422,6 +433,8 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 
 	printf("Extracting %s...\n", game.Game);
 
+	auto langStrings = BuildLanguage(resFiles.Find(game.App == FileSys::APP_WolfensteinII ? "strings/english.lang" : "strings/english.json"));
+
 	auto ecwolfWl6 = game.App == FileSys::APP_WolfensteinII
 		? BuildECWolfArchive(
 			resFiles.Find("sb_wolfstone.bnk"),
@@ -437,18 +450,17 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 	zip.AddFile("vgahead.wl6", resFiles.Find("vgahead.wl6"));
 	zip.AddFile("vgagraph.wl6", resFiles.Find("vgagraph.wl6"));
 	zip.AddFile("vswap.wl6", resFiles.Find("vswap.wl6"));
+	zip.AddFile("language.json", langStrings.get());
 
 	switch(game.App)
 	{
 	case FileSys::APP_WolfensteinII:
-		zip.AddFile("language.bfile", resFiles.Find("strings/english.lang"));
 		break;
 	case FileSys::APP_WolfensteinYoungblood:
 		zip.AddFile("demo0.wl6", resFiles.Find("demo0.wl6"));
 		zip.AddFile("demo1.wl6", resFiles.Find("demo1.wl6"));
 		zip.AddFile("demo2.wl6", resFiles.Find("demo2.wl6"));
 		zip.AddFile("demo3.wl6", resFiles.Find("demo3.wl6"));
-		zip.AddFile("language.json", resFiles.Find("strings/english.json"));
 		break;
 	}
 

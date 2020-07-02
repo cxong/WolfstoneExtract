@@ -28,7 +28,7 @@ long crypt_data(bool decrypt, void* pbInput, int cbInput, void* pbEncKey, int cb
 	}
 
 	if(cbIV > CBIV_MAX)
-		return 1;
+		return -1;
 
 	int algsock = socket(AF_ALG, SOCK_SEQPACKET, 0);
 	if(algsock < 0)
@@ -112,8 +112,11 @@ long crypt_data(bool decrypt, void* pbInput, int cbInput, void* pbEncKey, int cb
 	// which should be blocksize-bytesleft.  (AES-CBC uses 16 byte blocks.)
 	// I guess we just hope that there's not a complete final block with a 15
 	// as the last byte?
-	*cbOutput -= 16 - ((uint8_t*)pbOutput)[*cbOutput-1];
-
+	uint8_t padding = ((uint8_t*)pbOutput)[*cbOutput-1];
+	if(padding > 16)
+		return -1;
+	*cbOutput -= 16 - padding;
+	
 	close(sock);
 	close(algsock);
 

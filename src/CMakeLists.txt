@@ -25,7 +25,7 @@ add_executable(wolfstoneextract
 
 set_target_properties(wolfstoneextract PROPERTIES CXX_STANDARD 17)
 
-target_link_libraries(wolfstoneextract ooz revorb ww2ogg)
+target_link_libraries(wolfstoneextract idCrypt ooz revorb ww2ogg)
 
 if(MSVC)
 	target_compile_definitions(wolfstoneextract PUBLIC -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS)

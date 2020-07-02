@@ -41,6 +41,7 @@
 #include <algorithm>
 #include <memory>
 
+#include <idCrypt.h>
 #include <kraken.h>
 
 #define Printf printf
@@ -113,6 +114,7 @@ struct FIdclLump : public FResourceLump
 {
 	int64_t CompressedSize;
 	int64_t Position;
+	bool Encrypted;
 
 	FileReader *GetReader()
 	{
@@ -146,7 +148,21 @@ struct FIdclLump : public FResourceLump
 		{
 			auto cdata = std::make_unique<uint8_t[]>(CompressedSize);
 			Owner->Reader->Read(cdata.get(), CompressedSize);
-			if(Kraken_Decompress(cdata.get(), CompressedSize, (uint8_t*)Cache, LumpSize) < 0)
+			auto cdataSize = CompressedSize;
+
+			if(Encrypted)
+			{
+				idCrypt_t crypt;
+				if(idCrypt(&crypt, cdata.get(), CompressedSize, FullName.GetChars(), true) != 0)
+					throw CFatalError("Decryption failed.");
+
+				memcpy(cdata.get(), crypt.cryptedText, crypt.cryptedTextSize);
+				free(crypt.cryptedText);
+
+				cdataSize = crypt.cryptedTextSize;
+			}
+
+			if(Kraken_Decompress(cdata.get(), cdataSize, (uint8_t*)Cache, LumpSize) < 0)
 				throw CFatalError("Kraken decompression failed.");
 		}
 
@@ -228,21 +244,58 @@ bool FIdclFile<Ver>::Open(bool quiet)
 		dirEntries[i].size = LittleLongLong(dirEntries[i].size);
 		dirEntries[i].typeIndicator = LittleLong(dirEntries[i].typeIndicator);
 
-		// Seemingly uncompressed entry could be compressed if typeIndicator is
-		// 4, but the sizes will be in the header of the data.
-		if(dirEntries[i].typeIndicator == 4 && dirEntries[i].compressedSize == dirEntries[i].size)
+		bool encrypted = false;
+
+		if(dirEntries[i].compressedSize == dirEntries[i].size)
 		{
-			Reader->Seek(dirEntries[i].offset, SEEK_SET);
-			Reader->Read(&dirEntries[i].size, 8);
-			Reader->Read(&dirEntries[i].compressedSize, 8);
+			switch(dirEntries[i].typeIndicator)
+			{
+			// Wolfenstein II language files have an indicator of 1 and are
+			// encrypted and oodle compressed.  Youngblood language files are
+			// 3 and are not encrypted but still compressed.
+			case 1:
+			{
+				encrypted = true;
 
-			dirEntries[i].offset += 16;
-			dirEntries[i].compressedSize = LittleLongLong(dirEntries[i].compressedSize);
-			dirEntries[i].size = LittleLongLong(dirEntries[i].size);
+				Reader->Seek(dirEntries[i].offset, SEEK_SET);
+				uint32_t size;
+				Reader->Read(&size, 4);
 
-			// compressedSize of -1 means uncompressed
-			if(dirEntries[i].compressedSize == std::numeric_limits<uint64_t>::max())
-				dirEntries[i].compressedSize = dirEntries[i].size;
+				dirEntries[i].offset += 4;
+				dirEntries[i].compressedSize -= 4;
+				dirEntries[i].size = LittleLong(size);
+				break;
+			}
+
+			case 3:
+			{
+				Reader->Seek(dirEntries[i].offset, SEEK_SET);
+				uint32_t size, csize;
+				Reader->Read(&size, 4);
+				Reader->Read(&csize, 4);
+
+				dirEntries[i].offset += 8;
+				dirEntries[i].compressedSize = LittleLong(csize);
+				dirEntries[i].size = LittleLong(size);
+				break;
+			}
+
+			// Seemingly uncompressed entry could be compressed if typeIndicator
+			// is 4, but the sizes will be in the header of the data.
+			case 4:
+				Reader->Seek(dirEntries[i].offset, SEEK_SET);
+				Reader->Read(&dirEntries[i].size, 8);
+				Reader->Read(&dirEntries[i].compressedSize, 8);
+
+				dirEntries[i].offset += 16;
+				dirEntries[i].compressedSize = LittleLongLong(dirEntries[i].compressedSize);
+				dirEntries[i].size = LittleLongLong(dirEntries[i].size);
+
+				// compressedSize of -1 means uncompressed
+				if(dirEntries[i].compressedSize == std::numeric_limits<uint64_t>::max())
+					dirEntries[i].compressedSize = dirEntries[i].size;
+				break;
+			}
 		}
 
 		FString name = stringTable[fileIds[i].name];
@@ -263,6 +316,7 @@ bool FIdclFile<Ver>::Open(bool quiet)
 			lump.LumpSize = dirEntries[i].size;
 			lump.CompressedSize = dirEntries[i].compressedSize;
 			lump.Position = dirEntries[i].offset;
+			lump.Encrypted = encrypted;
 		}
 	}
 
