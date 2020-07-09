@@ -727,6 +727,8 @@ const SCString &Scanner::Escape(SCString &str)
 		for(SCString_Index p = 0;p < SCString_Len(str) && (p = SCString_IndexOf(str, resultCharacters[i], p)) != SCString_NPos(str);p += 2)
 		{
 			SCString_InsertChar(str, p, '\\');
+			if(resultCharacters[i] != escapeCharacters[i])
+				SCString_ReplaceChar(str, p+1, escapeCharacters[i]);
 		}
 	}
 	return str;

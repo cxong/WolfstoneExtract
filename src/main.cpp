@@ -3,6 +3,7 @@
 #include "filesys_steam.h"
 #include "filesys.h"
 #include "resourcefile.h"
+#include "scanner.h"
 #include "soundbank.h"
 #include "zip.h"
 #include "zstring.h"
@@ -139,6 +140,27 @@ static const std::map<uint32_t, const char*> SoundNames = {
 	{0x3ED3FE9Fu, "DSHITDTH"}
 };
 
+// Typically #str_wolfstone_x is STR_X, but some we need to do an explicit
+// mapping for
+static const std::map<std::string, const char*> LangMap = {
+	{"#str_wolfstone_curgame", "CURGAME"},
+	{"#str_wolfstone_episode1", "WL_EPISODE1"},
+	{"#str_wolfstone_episode2", "WL_EPISODE2"},
+	{"#str_wolfstone_episode3", "WL_EPISODE3"},
+	{"#str_wolfstone_episode4", "WL_EPISODE4"},
+	{"#str_wolfstone_episode5", "WL_EPISODE5"},
+	{"#str_wolfstone_episode6", "WL_EPISODE6"},
+
+	// The following are technically correctly named but ECWolf prefers them in
+	// a different form. So rename them to something else that isn't used.
+	{"#str_wolfstone_ratkill", "STR_RATKILL_FULL"},
+	{"#str_wolfstone_rat2kill", "STR_RAT2KILL_FULL"},
+	{"#str_wolfstone_ratsecret", "STR_RATSECRET_FULL"},
+	{"#str_wolfstone_rat2secret", "STR_RAT2SECRET_FULL"},
+	{"#str_wolfstone_rattreasure", "STR_RATTREASURE_FULL"},
+	{"#str_wolfstone_rat2treasure", "STR_RAT2TREASURE_FULL"}
+};
+
 //using ResourceCollection = std::vector<std::unique_ptr<FResourceFile>>;
 struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
 {
@@ -205,12 +227,13 @@ struct MemoryLump : FResourceLump
 
 // Creates ecwolf.wl6 data from the sound banks
 template<typename ... T> // T should be FResourceLump but C++ doesn't have a nice way to represent that
-static std::unique_ptr<FResourceLump> BuildECWolfArchive(T* ... soundResource)
+static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *langLump, T* ... soundResource)
 {
 	// We need to keep these around until we can make the FZip::Build call.
 	std::vector<std::unique_ptr<MemoryLump>> soundStorage;
 
 	FZip archive;
+	archive.AddFile("language.txt", langLump);
 
 	auto readers = std::array<std::unique_ptr<FileReader>, sizeof...(soundResource)>{
 		std::unique_ptr<FileReader>{soundResource->NewReader()}...
@@ -246,11 +269,43 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(T* ... soundResource)
 // Creates language.txt from strings data
 static std::unique_ptr<FResourceLump> BuildLanguage(FResourceLump *langLump)
 {
-	// TODO: Actually implement this
-	std::vector<uint8_t> data;
-	data.resize(langLump->LumpSize);
-	memcpy(data.data(), langLump->CacheLump(), langLump->LumpSize);
+	constexpr static const char* stringPrefix = "#str_wolfstone_";
+	constexpr static const uint8_t utf8ByteOrderMark[3] = {0xEF, 0xBB, 0xBF};
+
+	const char* langData = static_cast<char*>(langLump->CacheLump());
+	if(langLump->LumpSize >= sizeof(utf8ByteOrderMark) && memcmp(langData, utf8ByteOrderMark, sizeof(utf8ByteOrderMark)) == 0)
+		langData += sizeof(utf8ByteOrderMark);
+	Scanner sc{langData, static_cast<size_t>(langLump->LumpSize)};
 	langLump->ReleaseCache();
+
+	FString out = "[enu default]\n";
+	sc.MustGetToken('{');
+	while(!sc.CheckToken('}'))
+	{
+		sc.MustGetToken(TK_StringConst);
+		FString key = sc->str;
+
+		sc.MustGetToken(TK_StringConst);
+		FString value = sc->str;
+
+		if(auto remap = LangMap.find(key.GetChars()); remap != LangMap.end())
+		{
+			key = remap->second;
+		}
+		else if(key.Left(strlen(stringPrefix)).Compare(stringPrefix) == 0)
+		{
+			key.ToUpper();
+			key = FString("STR_") + key.Mid(strlen(stringPrefix));
+		}
+		else
+			continue;
+
+		out += key + " = \"" + Scanner::Escape(value) + "\";\n";
+	}
+
+	std::vector<uint8_t> data;
+	data.resize(out.Len());
+	memcpy(data.data(), out.GetChars(), out.Len());
 	return std::make_unique<MemoryLump>(std::move(data));
 }
 
@@ -437,10 +492,11 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 
 	auto ecwolfWl6 = game.App == FileSys::APP_WolfensteinII
 		? BuildECWolfArchive(
+			langStrings.get(),
 			resFiles.Find("sb_wolfstone.bnk"),
 			resFiles.Find(language + "/sb_vo_wolfstone.bnk")
 		)
-		: BuildECWolfArchive(resFiles.Find(language + "/wolfstone.bnk"));
+		: BuildECWolfArchive(langStrings.get(), resFiles.Find(language + "/wolfstone.bnk"));
 
 	FZip zip;
 	zip.AddFile("ecwolf.wl6", ecwolfWl6.get());
@@ -450,7 +506,6 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 	zip.AddFile("vgahead.wl6", resFiles.Find("vgahead.wl6"));
 	zip.AddFile("vgagraph.wl6", resFiles.Find("vgagraph.wl6"));
 	zip.AddFile("vswap.wl6", resFiles.Find("vswap.wl6"));
-	zip.AddFile("language.json", langStrings.get());
 
 	switch(game.App)
 	{
