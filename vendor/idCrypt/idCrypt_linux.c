@@ -115,7 +115,7 @@ long crypt_data(bool decrypt, void* pbInput, int cbInput, void* pbEncKey, int cb
 	uint8_t padding = ((uint8_t*)pbOutput)[*cbOutput-1];
 	if(padding > 16)
 		return -1;
-	*cbOutput -= 16 - padding;
+	*cbOutput -= padding;
 	
 	close(sock);
 	close(algsock);
