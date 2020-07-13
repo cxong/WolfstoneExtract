@@ -40,11 +40,6 @@
 #include <memory>
 #include <tuple>
 
-// We can't rely on the data files providing a correct date so lets set all the
-// files to the date of Wolfenstein II's release so that the output of this
-// program is still a constant.
-constexpr uint16_t WOLFII_DATE = 0x4B5B; // October 27, 2017
-
 #pragma pack(push, 1)
 
 struct FFileHeader
@@ -55,7 +50,7 @@ struct FFileHeader
 	uint16_t Flags = 0;
 	uint16_t Method = 0;
 	uint16_t MTime = 0;
-	uint16_t MDate = WOLFII_DATE;
+	uint16_t MDate;
 	uint32_t Crc32;
 	uint32_t CSize;
 	uint32_t USize;
@@ -73,7 +68,7 @@ struct FDirectoryFile
 	uint16_t Flags = 0;
 	uint16_t Method = 0;
 	uint16_t MTime = 0;
-	uint16_t MDate = WOLFII_DATE;
+	uint16_t MDate;
 	uint32_t Crc32;
 	uint32_t CSize;
 	uint32_t USize;
@@ -161,6 +156,7 @@ std::vector<uint8_t> FZip::Build() const
 		FFileHeader fh;
 		FDirectoryFile df;
 
+		df.MDate = fh.MDate = Date;
 		fh.CSize = fh.USize = df.CSize = df.USize = lump->LumpSize;
 		fh.FileNameLength = df.FileNameLength = uint16_t(path.Len());
 		df.Offset = offset;

@@ -205,6 +205,12 @@ FSoundbank::FSoundbank(FileReader *reader)
 		index.WemId = LittleLong(index.WemId);
 		index.Offset = LittleLong(index.Offset);
 		index.Length = LittleLong(index.Length);
+
+		// Some sound banks don't have the SFX info, so we'll just use the
+		// WemID.  Honestly I'm not sure if the SoundID/FileID is the right
+		// thing to use.
+		if(wemToSoundId.CheckKey(index.WemId) == nullptr)
+			wemToSoundId[index.WemId] = index.WemId;
 		//printf("%u: WemId = %X, Offset = %u, Length = %u; Sound Id = %X\n", i, index.WemId, index.Offset, index.Length, wemToSoundId[index.WemId]);
 
 		Sounds[i] = {dataChunk->Offset + index.Offset, index.Length, wemToSoundId[index.WemId]};
@@ -227,19 +233,26 @@ FSoundbank::FSoundbank(FileReader *reader)
 			throw CRecoverableError("Failed to read sound data");
 		}
 
-		// Convert to standard Vorbis
-		std::istringstream istream{{(const char*)sound.Data.data(), sound.Length}};
-		Wwise_RIFF_Vorbis decoder(istream, packed_codebooks_aoTuV_603, sizeof(packed_codebooks_aoTuV_603), false, false, kNoForcePacketFormat);
-
-		std::stringstream generatedStream;
-		decoder.generate_ogg(generatedStream);
-
-		std::ostringstream ostream;
-		if(!revorb(generatedStream, ostream))
-			throw CRecoverableError("Failed to rebuild granules");
-
-		sound.Data.resize(ostream.str().length());
-		memcpy(sound.Data.data(), ostream.str().data(), ostream.str().length());
+		sound.Data = ConvertWem(sound.Data.data(), sound.Length);
 	}
 	puts("");
+}
+
+std::vector<uint8_t> FSoundbank::ConvertWem(void* data, unsigned int length)
+{
+	// Convert to standard Vorbis
+	std::istringstream istream{{reinterpret_cast<const char*>(data), static_cast<size_t>(length)}};
+	Wwise_RIFF_Vorbis decoder(istream, packed_codebooks_aoTuV_603, sizeof(packed_codebooks_aoTuV_603), false, false, kNoForcePacketFormat);
+
+	std::stringstream generatedStream;
+	decoder.generate_ogg(generatedStream);
+
+	std::ostringstream ostream;
+	if(!revorb(generatedStream, ostream))
+		throw CRecoverableError("Failed to rebuild granules");
+
+	std::vector<uint8_t> out;
+	out.resize(ostream.str().length());
+	memcpy(out.data(), ostream.str().data(), ostream.str().length());
+	return out;
 }

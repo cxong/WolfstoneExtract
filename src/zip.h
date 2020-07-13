@@ -43,11 +43,18 @@
 
 struct FResourceLump;
 
+constexpr uint16_t DOSDate(int year, int month, int day)
+{
+	return ((year-1980)<<9)|((month&0xF)<<5)|(day&0x1F);
+}
+
 class FZip
 {
 	std::map<FString, FResourceLump*> Entries;
+	uint16_t Date = 0;
 
 public:
 	void AddFile(FString path, FResourceLump *data);
 	std::vector<uint8_t> Build() const;
+	void SetDate(uint16_t date) { Date = date; }
 };

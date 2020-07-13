@@ -54,5 +54,7 @@ struct FSoundbank
 
 	FSoundbank(FileReader *reader);
 
+	static std::vector<uint8_t> ConvertWem(void* data, unsigned int length);
+
 	TArray<Entry> Sounds;
 };

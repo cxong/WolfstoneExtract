@@ -300,9 +300,8 @@ bool FIdclFile<Ver>::Open(bool quiet)
 
 		FString name = stringTable[fileIds[i].name];
 		if(name.Right(4).Compare(".wl6") == 0 ||
-			name.Right(19).Compare("sb_vo_wolfstone.bnk") == 0 ||
-			name.Right(16).Compare("sb_wolfstone.bnk") == 0 ||
-			name.Right(13).Compare("wolfstone.bnk") == 0 ||
+			name.Right(4).Compare(".bnk") == 0 ||
+			name.Right(4).Compare(".wem") == 0 ||
 			name.Left(8).Compare("strings/") == 0)
 		{
 			FIdclLump &lump = Lumps[NumLumps++];

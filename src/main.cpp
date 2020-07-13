@@ -17,7 +17,15 @@
 
 static const FString soundsPath = "sound" PATH_SEPARATOR "soundbanks" PATH_SEPARATOR "pc";
 
-static const std::map<uint32_t, const char*> SoundNames = {
+// We can't rely on the data files providing a correct date so lets set all the
+// files to the date of Wolfenstein II's release so that the output of this
+// program is still a constant.
+constexpr auto WOLFII_DATE = DOSDate(2017, 10, 27);
+constexpr auto YOUNGBLOOD_DATE = DOSDate(2019, 7, 25);
+
+using FSoundNameTable = const std::map<uint32_t, const char*>;
+
+static FSoundNameTable WolfstoneSoundNames = {
 	{0x00A7A4A8u, "DSSWITCH"},
 	{0x011D4829u, "DSMCHSTP"},
 	{0x015F0AC5u, "DSDOGDTH"},
@@ -140,6 +148,124 @@ static const std::map<uint32_t, const char*> SoundNames = {
 	{0x3ED3FE9Fu, "DSHITDTH"}
 };
 
+static FSoundNameTable EliteHansSoundNames = {
+	{0x0140173Du, "DSSSFIRE"},
+	{0x018801ABu, "DSGDDTH8"},
+	{0x02DBE468u, "DSMVGUN2"},
+	{0x03116A17u, "DSSHTDOR"},
+	{0x04903C67u, "DSGETKEY"},
+	{0x05A26791u, "DSWALK2"},
+	{0x064405D0u, "DSDRCLS"},
+	{0x073ABB0Cu, "DSWALK1"},
+	{0x07BFC6E0u, "DSBONUS2"},
+	{0x07DE4D48u, "DSBOSSI2"},
+	{0x07E460A8u, "DSMEDIUP"},
+	{0x08640562u, "DSBONUS4"},
+	{0x08FA10B2u, "DSGMOVER"},
+	{0x0B8D2677u, "DSBONUS1"},
+	{0x0BC08128u, "DSNOBNS"},
+	{0x0BE15E7Bu, "DSESCPRS"},
+	{0x0D754F33u, "DSBAREXP"},
+	{0x0ECBF2EDu, "DSBOSSFR"},
+	{0x0F239149u, "DSGOOB"},
+	{0x1075648Fu, "DSSLURPE"},
+	{0x11341359u, "DSBONUS3"},
+	{0x12DB7EA6u, "DSGDDTH2"},
+	{0x132EA92Cu, "DSDROPN"},
+	{0x1345EEC1u, "DSMCHSTP"},
+	{0x140E8BBFu, "DSSCBATK"},
+	{0x144C96FBu, "DSPLDETH"},
+	{0x15915329u, "DSNOWAY"},
+	{0x15D4A3ECu, "DSNAZIHT"},
+	{0x166A537Du, "DSGDDTH6"},
+	{0x16E72951u, "DSCGUNUP"},
+	{0x17EF6D70u, "DSNAZPAI"},
+	{0x1AEA00D1u, "DSAMMOUP"},
+	{0x1C7EABEFu, "DSSWITCH"},
+	{0x20733D71u, "DSNOTIN"},
+	{0x2229CA70u, "DSGDDTH1"},
+	{0x24265DA7u, "DSCGUN"},
+	{0x2563C672u, "DSYEAH"},
+	{0x27C503C7u, "DSGDDTH4"},
+	{0x28A272CCu, "DSPSHWAL"},
+	{0x28CDC740u, "DSKNFSWG"},
+	{0x293C4617u, "DSBOSSIT"},
+	{0x2A186AFBu, "DSFART"},
+	{0x2AAB0F89u, "DSDOGDTH"},
+	{0x2B53FE1Au, "DSFOODUP"},
+	{0x2B760104u, "DSGDDTH5"},
+	{0x2CC45E4Eu, "DSSLCTWN"},
+	{0x2FFF9F9Eu, "DSRLAUNC"},
+	{0x3033F9A4u, "DSDOGSIT"},
+	{0x30B6E57Eu, "DSHARTBT"},
+	{0x30C9E01Au, "DSGDDTH3"},
+	{0x3107288Du, "DSMVGUN1"},
+	{0x32478A6Au, "DSPRC100"},
+	{0x3373147Bu, "DSPLPAIN"},
+	{0x33CCF4E9u, "DSBNS1UP"},
+	{0x345ADA46u, "DSPISTOL"},
+	{0x34B28759u, "DSDOGATK"},
+	{0x370433CAu, "DSNOITEM"},
+	{0x3744FCD8u, "DSGDDTH7"},
+	{0x3768EFFBu, "DSMUTDTH"},
+	{0x37A23BCDu, "DSFAKFIR"},
+	{0x381DC6B8u, "DSMGUNUP"},
+	{0x397E48CCu, "DSMGUN"},
+	{0x3CF22009u, "DSENDBN2"},
+	{0x3D81EF6Eu, "DSGRDFIR"},
+	{0x3E1FCDE2u, "DSHITWAL"},
+	{0x3E244F37u, "DSSELECT"},
+	{0x3FB7865Au, "DSENDBN1"},
+	{0x3FC5D66Bu, "DSSLCTIT"},
+
+	// Music are loose WEM files in generic sound pack
+	{0x0736EF20u, "URAHERO"},
+	{0x0839C12Fu, "NAZI_RAP"},
+	{0x0E4330B6u, "NAZI_NOR"}, // Actually HITLWLTZ
+	{0x11985AF6u, "SEARCHN"},
+	{0x137C718Bu, "NAZI_OMI"}, // Actually VICTORS
+	{0x181A1A36u, "GETTHEM"},
+	{0x18AE34A1u, "PACMAN"},
+	{0x1A682365u, "WARMARCH"},
+	{0x1A7D2BF6u, "SUSPENSE"},
+	{0x1D88A829u, "WONDERIN"},
+	{0x22E25169u, "ROSTER"},
+	{0x25C4337Cu, "PREGNANT"},
+	{0x26D7BFF4u, "ZEROHOUR"},
+	{0x28F03F6Bu, "TWELFTH"},
+	{0x2B7F2798u, "ULTIMATE"},
+	{0x2BEC1B09u, "POW"},
+	{0x2D81808Eu, "SALUTE"},
+	{0x2E4DD2DCu, "DUNGEON"},
+	{0x2E78620Cu, "GOINGAFT"},
+	{0x35DA1B49u, "ENDLEVEL"},
+	{0x39AC8E60u, "FUNKYOU"},
+	{0x3FA0193Eu, "CORNER"},
+	{0x3FCFC182u, "HEADACHE"},
+
+	// Voices are loose WEM files in language pack
+	{0x0015A563u, "DSHITDTH"},
+	{0x07E8EEDDu, "DSFATDTH"},
+	{0x0CA4A00Du, "DSGRTSIT"},
+	{0x0E5E84A3u, "DSHITSIT"},
+	{0x09D75597u, "DSFAKDTH"},
+	{0x166E7272u, "DSFAKSIT"},
+	{0x185DA298u, "DSSCBSIT"},
+	{0x1A949A42u, "DSOTOSIT"},
+	{0x1AC5C079u, "DSHANDTH"},
+	{0x1C8A4903u, "DSGRDSIT"},
+	{0x1E34DB4Au, "DSHITSHI"},
+	{0x1F565751u, "DSFATSIT"},
+	{0x20B7F099u, "DSSCBDTH"},
+	{0x210F1B75u, "DSOFFSIT"},
+	{0x280250E2u, "DSOTODTH"},
+	{0x2F77B9C1u, "DSSSDTH"},
+	{0x3341EAC7u, "DSSSSIT"},
+	{0x3409E700u, "DSGRTDTH"},
+	{0x3D69DE8Au, "DSHANSIT"},
+	{0x3FC1AC3Cu, "DSOFFDTH"}
+};
+
 // Typically #str_wolfstone_x is STR_X, but some we need to do an explicit
 // mapping for
 static const std::map<std::string, const char*> LangMap = {
@@ -205,7 +331,9 @@ struct GameInfo
 	const char* Name;
 	const char* Game;
 	const char* OutputName;
+	FSoundNameTable &SoundNames;
 	ResourceCollection (*LoadResources)(FString, FString);
+	uint16_t Date;
 };
 
 struct MemoryLump : FResourceLump
@@ -225,14 +353,29 @@ struct MemoryLump : FResourceLump
 	}
 };
 
+static const char* MakeSoundFilename(char* dest, int destLen, uint32_t id, const char* name)
+{
+	if(name[0] != 0 && !(name[0] == 'D' && name[1] == 'S'))
+		snprintf(dest, destLen, "music/%s.ogg", name);
+	else if(name[0] != 0)
+		snprintf(dest, destLen, "sounds/%s.ogg", name);
+	else
+	{
+		fprintf(stderr, "Sound %08X does not have a name assigned. This is probably a bug.\n", id);
+		snprintf(dest, destLen, "sounds/%08X.ogg", id);
+	}
+	return dest;
+}
+
 // Creates ecwolf.wl6 data from the sound banks
 template<typename ... T> // T should be FResourceLump but C++ doesn't have a nice way to represent that
-static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *langLump, T* ... soundResource)
+static std::unique_ptr<FResourceLump> BuildECWolfArchive(const GameInfo &game, const ResourceCollection &resFiles, FResourceLump *langLump, T* ... soundResource)
 {
 	// We need to keep these around until we can make the FZip::Build call.
 	std::vector<std::unique_ptr<MemoryLump>> soundStorage;
 
 	FZip archive;
+	archive.SetDate(game.Date);
 	archive.AddFile("language.txt", langLump);
 
 	auto readers = std::array<std::unique_ptr<FileReader>, sizeof...(soundResource)>{
@@ -246,21 +389,47 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(FResourceLump *langLump
 		{
 			uint32_t id = bank.Sounds[i].Id;
 			const char* sname = "";
-			if(auto value = SoundNames.find(id); value != SoundNames.end())
+			if(auto value = game.SoundNames.find(id); value != game.SoundNames.end())
 				sname = value->second;
 
 			char name[32];
-			if(sname[0] != 0 && !(sname[0] == 'D' && sname[1] == 'S'))
-				snprintf(name, 32, "music/%s.ogg", sname);
-			else if(sname[0] != 0)
-				snprintf(name, 32, "sounds/%s.ogg", sname);
-			else
-			{
-				fprintf(stderr, "Sound %08X does not have a name assigned. This is probably a bug.\n", id);
-				snprintf(name, 32, "sounds/%08X.ogg", id);
-			}
-			archive.AddFile(name, soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(bank.Sounds[i].Data))).get());
+			archive.AddFile(MakeSoundFilename(name, 32, id, sname), soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(bank.Sounds[i].Data))).get());
 		}
+	}
+
+	// Look for loose wem files with the right ID. Right now we only need to do
+	// this for Youngblood as Wolfenstein II has everything in the soundbanks.
+	if(game.App == FileSys::APP_WolfensteinYoungblood)
+	{
+		int found = 0;
+		printf("Scanning for additional sounds:     0");
+		fflush(stdout);
+		for(auto iter = resFiles.rbegin(); iter != resFiles.rend(); ++iter)
+		{
+			for(unsigned int i = 0; i < (*iter)->LumpCount(); ++i)
+			{
+				auto lump = (*iter)->GetLump(i);
+
+				auto name = lump->FullName;
+				if(name.Right(4).Compare(".wem") != 0)
+					continue;
+
+				if(auto index = name.LastIndexOf('/'); index != -1)
+					name = name.Mid(index+1);
+
+				const auto id = strtoul(name, nullptr, 10);
+				if(auto entry = game.SoundNames.find(id); entry != game.SoundNames.end())
+				{
+					printf("\b\b\b\b\b%5d", found++);
+					fflush(stdout);
+
+					char buf[32];
+					archive.AddFile(MakeSoundFilename(buf, 32, id, entry->second), soundStorage.emplace_back(std::make_unique<MemoryLump>(FSoundbank::ConvertWem(lump->CacheLump(), lump->LumpSize))).get());
+					lump->ReleaseCache();
+				}
+			}
+		}
+		puts("");
 	}
 
 	return std::make_unique<MemoryLump>(archive.Build());
@@ -492,13 +661,19 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 
 	auto ecwolfWl6 = game.App == FileSys::APP_WolfensteinII
 		? BuildECWolfArchive(
+			game, resFiles,
 			langStrings.get(),
 			resFiles.Find("sb_wolfstone.bnk"),
 			resFiles.Find(language + "/sb_vo_wolfstone.bnk")
 		)
-		: BuildECWolfArchive(langStrings.get(), resFiles.Find(language + "/wolfstone.bnk"));
+		: BuildECWolfArchive(
+			game, resFiles,
+			langStrings.get(),
+			resFiles.Find(language + "/wolfstone.bnk")
+		);
 
 	FZip zip;
+	zip.SetDate(game.Date);
 	zip.AddFile("ecwolf.wl6", ecwolfWl6.get());
 	zip.AddFile("gamemaps.wl6", resFiles.Find("gamemaps.wl6"));
 	zip.AddFile("maphead.wl6", resFiles.Find("maphead.wl6"));
@@ -539,8 +714,8 @@ static std::tuple<GameInfo, FString> PickGame()
 {
 	constexpr std::array<GameInfo, FileSys::NUM_STEAM_APPS> GameInfoTable
 	{
-		GameInfo{FileSys::APP_WolfensteinII, "Wolfenstein II", "Wolfstone 3D", "wolfstone.pk3", LoadWolfensteinIIResources},
-		GameInfo{FileSys::APP_WolfensteinYoungblood, "Wolfenstein: Youngblood", "Elite Hans: Die Neue Ordnung", "elitehans.pk3", LoadYoungbloodResources}
+		GameInfo{FileSys::APP_WolfensteinII, "Wolfenstein II", "Wolfstone 3D", "wolfstone.pk3", WolfstoneSoundNames, LoadWolfensteinIIResources, WOLFII_DATE},
+		GameInfo{FileSys::APP_WolfensteinYoungblood, "Wolfenstein: Youngblood", "Elite Hans: Die Neue Ordnung", "elitehans.pk3", EliteHansSoundNames, LoadYoungbloodResources, YOUNGBLOOD_DATE}
 	};
 
 	TArray<std::tuple<GameInfo, FString>> candidates;
