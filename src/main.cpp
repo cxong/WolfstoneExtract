@@ -287,6 +287,22 @@ static const std::map<std::string, const char*> LangMap = {
 	{"#str_wolfstone_rat2treasure", "STR_RAT2TREASURE_FULL"}
 };
 
+static const std::map<std::string, const char*> LanguageCodes = {
+	{"brazilian_portuguese", "ptb"},
+	{"english", "enu default"},
+	{"french", "fr"},
+	{"german", "de"},
+	{"italian", "ita"},
+	{"japanese", "jpn"},
+	{"korean", "kok"},
+	{"latin_spanish", "esm"},
+	{"polish", "plk"},
+	{"russian", "rus"},
+	{"s_chinese", "chs"},
+	{"spanish", "es"},
+	{"t_chinese", "cht"}
+};
+
 //using ResourceCollection = std::vector<std::unique_ptr<FResourceFile>>;
 struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
 {
@@ -436,7 +452,7 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(const GameInfo &game, c
 }
 
 // Creates language.txt from strings data
-static std::unique_ptr<FResourceLump> BuildLanguage(FResourceLump *langLump)
+static FString ConvertLanguage(const char* langCode, FResourceLump *langLump)
 {
 	constexpr static const char* stringPrefix = "#str_wolfstone_";
 	constexpr static const uint8_t utf8ByteOrderMark[3] = {0xEF, 0xBB, 0xBF};
@@ -447,7 +463,7 @@ static std::unique_ptr<FResourceLump> BuildLanguage(FResourceLump *langLump)
 	Scanner sc{langData, static_cast<size_t>(langLump->LumpSize)};
 	langLump->ReleaseCache();
 
-	FString out = "[enu default]\n";
+	FString out = FString("[") + langCode + "]\n";
 	sc.MustGetToken('{');
 	while(!sc.CheckToken('}'))
 	{
@@ -470,6 +486,48 @@ static std::unique_ptr<FResourceLump> BuildLanguage(FResourceLump *langLump)
 			continue;
 
 		out += key + " = \"" + Scanner::Escape(value) + "\";\n";
+	}
+
+	return out + "\n";
+}
+
+static std::unique_ptr<FResourceLump> BuildLanguage(const ResourceCollection &resFiles)
+{
+	std::map<std::string, FResourceLump*> stringsLumps;
+	for(auto iter = resFiles.rbegin(); iter != resFiles.rend(); ++iter)
+	{
+		for(unsigned int i = 0; i < (*iter)->LumpCount(); ++i)
+		{
+			auto lump = (*iter)->GetLump(i);
+			if(lump->FullName.Left(8).Compare("strings/") == 0)
+			{
+				std::string lang = lump->FullName.Mid(8, lump->FullName.LastIndexOf(".")-8).GetChars();
+				if(stringsLumps.find(lang) == stringsLumps.end())
+					stringsLumps[lang] = lump;
+			}
+		}
+	}
+
+	FString out;
+
+	for(const auto [lang, lump] : stringsLumps)
+	{
+		// Not sure why this is in the strings/ directory
+		if(lang == "shadowplay")
+			continue;
+
+		if(auto langCode = LanguageCodes.find(lang); langCode != LanguageCodes.end())
+		{
+			try {
+				out += ConvertLanguage(langCode->second, lump);
+			} catch(...) {
+				printf("Failed to decode strings for %s\n", lang.c_str());
+			}
+		}
+		else
+		{
+			printf("Skipping strings for %s as language code is unknown. This is probably a bug.\n", lang.c_str());
+		}
 	}
 
 	std::vector<uint8_t> data;
@@ -657,7 +715,7 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 
 	printf("Extracting %s...\n", game.Game);
 
-	auto langStrings = BuildLanguage(resFiles.Find(game.App == FileSys::APP_WolfensteinII ? "strings/english.lang" : "strings/english.json"));
+	auto langStrings = BuildLanguage(resFiles);
 
 	auto ecwolfWl6 = game.App == FileSys::APP_WolfensteinII
 		? BuildECWolfArchive(
