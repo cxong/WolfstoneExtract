@@ -45,6 +45,20 @@ constexpr uint32_t ReadBigLong(const uint8_t * const ptr)
 		uint32_t(uint8_t(*(ptr+3)));
 }
 
+static inline void WriteLittleLong(uint8_t * const ptr, uint32_t value)
+{
+	ptr[0] = value&0xFF;
+	ptr[1] = (value>>8)&0xFF;
+	ptr[2] = (value>>16)&0xFF;
+	ptr[3] = (value>>24)&0xFF;
+}
+
+static inline void WriteLittleShort(uint8_t * const ptr, uint16_t value)
+{
+	ptr[0] = value&0xFF;
+	ptr[1] = (value>>8)&0xFF;
+}
+
 // After the fact Byte Swapping ------------------------------------------------
 
 constexpr uint16_t SwapShort(uint16_t x)

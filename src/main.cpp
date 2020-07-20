@@ -9,6 +9,7 @@
 #include "zstring.h"
 
 #include <array>
+#include <cassert>
 #include <charconv>
 #include <cstdio>
 #include <regex>
@@ -359,6 +360,37 @@ $musicalias VICMARCH WARMARCH
 $musicalias VICMARCH INTROCW3
 )EOF";
 
+struct HighScore
+{
+	const char* Name;
+	uint32_t Score;
+	uint8_t Episode;
+	uint8_t Level;
+};
+
+// I believe these default score tables are in the game code so digging them
+// out would be a lot of work and probably be unreliable if the data were to
+// change.
+constexpr std::array WolfstoneScores {
+	HighScore{"Max Hass", 42000, 6, 2},
+	HighScore{"Caroline", 23000, 5, 1},
+	HighScore{"Set", 17000, 4, 2},
+	HighScore{"Panzer Mouse", 15000, 4, 1},
+	HighScore{"Anya", 13000, 4, 1},
+	HighScore{"Bombate", 10000, 3, 2},
+	HighScore{"Shoshana", 7000, 2, 2}
+};
+
+constexpr std::array EliteHansScores {
+	HighScore{"Maria", 43000, 2, 6},
+	HighScore{"Kenneth", 35000, 2, 6},
+	HighScore{"Arthur", 34000, 2, 5},
+	HighScore{"Lafayette", 19000, 2, 3},
+	HighScore{"Dimitri", 17000, 2, 3},
+	HighScore{"Abby", 16000, 2, 2},
+	HighScore{"Muldeen", 3000, 1, 1}
+};
+
 //using ResourceCollection = std::vector<std::unique_ptr<FResourceFile>>;
 struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
 {
@@ -405,6 +437,7 @@ struct GameInfo
 	const char* OutputName;
 	FSoundNameTable &SoundNames;
 	const FString &MapinfoEpisodes;
+	const std::array<HighScore, 7> &Scores;
 	ResourceCollection (*LoadResources)(FString, FString);
 	uint16_t Date;
 };
@@ -516,6 +549,66 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(const GameInfo &game, c
 	}
 
 	return std::make_unique<MemoryLump>(archive.Build());
+}
+
+// Builds config.wl6
+static std::unique_ptr<FResourceLump> BuildConfig(const std::array<HighScore, 7> &scores)
+{
+	std::vector<uint8_t> configData;
+	configData.resize(522);
+	memset(configData.data(), 0, configData.size());
+
+	uint8_t *ptr = configData.data();
+	for(auto score : scores)
+	{
+		strncpy(reinterpret_cast<char*>(ptr), score.Name, 57);
+		WriteLittleLong(ptr+58, score.Score);
+		WriteLittleShort(ptr+62, score.Level);
+		WriteLittleShort(ptr+64, score.Episode-1);
+		ptr += 66;
+	}
+
+	// The values below are basically the default config.wl6 from Wolf3D.
+	// Just increased viewsize to match Wolfstone's screen size.
+
+	WriteLittleShort(ptr, 2); // sd
+	ptr += 2;
+	WriteLittleShort(ptr, 1); // sm
+	ptr += 2;
+	WriteLittleShort(ptr, 3); // sds
+	ptr += 2;
+	WriteLittleShort(ptr, 1); // mouseenabled
+	ptr += 2;
+	WriteLittleShort(ptr, 0); // joystickenabled
+	ptr += 2;
+	WriteLittleShort(ptr, 0); // joypadenabled
+	ptr += 2;
+	WriteLittleShort(ptr, 0); // joystickprogressive
+	ptr += 2;
+	WriteLittleShort(ptr, 0); // joystickport
+	ptr += 2;
+
+	constexpr std::array<uint16_t, 4+8+4+4> buttons {
+		0x48, 0x4D, 0x50, 0x4B, // dirscan
+		0x1D, 0x38, 0x36, 0x39, 0x02, 0x03, 0x04, 0x05, // buttonscan
+		0x00, 0x01, 0x03, 0xFFFF, // buttonmouse
+		0x00, 0x01, 0x03, 0x02 // buttonjoy
+	};
+	for(auto value : buttons)
+	{
+		WriteLittleShort(ptr, value);
+		ptr += 2;
+	}
+
+	WriteLittleShort(ptr, 0x13); // viewsize
+	ptr += 2;
+
+	WriteLittleShort(ptr, 5); // mouseadjustment
+	ptr += 2;
+
+	assert(ptr == configData.data()+configData.size());
+
+	return std::make_unique<MemoryLump>(std::move(configData));
 }
 
 // Creates language.txt from strings data
@@ -804,6 +897,9 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 	zip.AddFile("vgagraph.wl6", resFiles.Find("vgagraph.wl6"));
 	zip.AddFile("vswap.wl6", resFiles.Find("vswap.wl6"));
 
+	auto configLump = BuildConfig(game.Scores);
+	zip.AddFile("config.wl6", configLump.get());
+
 	// Add file for easy identification by contents
 	auto idLump = MemoryLump::FromString(FString(game.Game) +"\n\nExtracted from " + game.Name + " by WolfstoneExtract " TOOL_VERSION "\n");
 	zip.AddFile(FString(game.OutputName).Left(strlen(game.OutputName)-4) + ".txt", idLump.get());
@@ -840,8 +936,8 @@ static std::tuple<GameInfo, FString> PickGame()
 {
 	constexpr std::array<GameInfo, FileSys::NUM_STEAM_APPS> GameInfoTable
 	{
-		GameInfo{FileSys::APP_WolfensteinII, "Wolfenstein II", "Wolfstone 3D", "wolfstone.pk3", WolfstoneSoundNames, WolfstoneEpisodes, LoadWolfensteinIIResources, WOLFII_DATE},
-		GameInfo{FileSys::APP_WolfensteinYoungblood, "Wolfenstein: Youngblood", "Elite Hans: Die Neue Ordnung", "elitehans.pk3", EliteHansSoundNames, EliteHansEpisodes, LoadYoungbloodResources, YOUNGBLOOD_DATE}
+		GameInfo{FileSys::APP_WolfensteinII, "Wolfenstein II", "Wolfstone 3D", "wolfstone.pk3", WolfstoneSoundNames, WolfstoneEpisodes, WolfstoneScores, LoadWolfensteinIIResources, WOLFII_DATE},
+		GameInfo{FileSys::APP_WolfensteinYoungblood, "Wolfenstein: Youngblood", "Elite Hans: Die Neue Ordnung", "elitehans.pk3", EliteHansSoundNames, EliteHansEpisodes, EliteHansScores, LoadYoungbloodResources, YOUNGBLOOD_DATE}
 	};
 
 	TArray<std::tuple<GameInfo, FString>> candidates;
