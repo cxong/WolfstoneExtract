@@ -15,6 +15,8 @@
 #include <memory>
 #include <vector>
 
+#define TOOL_VERSION "1.0"
+
 static const FString soundsPath = "sound" PATH_SEPARATOR "soundbanks" PATH_SEPARATOR "pc";
 
 // We can't rely on the data files providing a correct date so lets set all the
@@ -44,8 +46,7 @@ static FSoundNameTable WolfstoneSoundNames = {
 	{0x084EC4ECu, "DSSHTDOR"},
 	{0x08B07D1Cu, "DSDROPN"},
 	{0x0910C9CEu, "DSMVGUN1"},
-	// Actually VICTORS bpt used where NAZI_OMI is
-	{0x09C2AFBAu, "NAZI_OMI"},
+	{0x09C2AFBAu, "VICTORS"},
 	{0x0A011B88u, "DSGDDTH5"},
 	{0x0A1A4A9Du, "DSGOOB"},
 	{0x0A3A2104u, "DSSSSIT"},
@@ -64,8 +65,7 @@ static FSoundNameTable WolfstoneSoundNames = {
 	{0x0FA36143u, "DSRLAUNC"},
 	{0x10B7A13Eu, "DSGDDTH4"},
 	{0x10FE10ACu, "DSHITSHI"},
-	// Actually HITLWLTZ but used where NAZI_NOR is
-	{0x11225254u, "NAZI_NOR"},
+	{0x11225254u, "HITLWLTZ"},
 	{0x11242DC5u, "DSFATSIT"},
 	{0x1167D12Cu, "DSPISTOL"},
 	{0x11BEF1F3u, "ENDLEVEL"},
@@ -127,8 +127,7 @@ static FSoundNameTable WolfstoneSoundNames = {
 	// to complete the adlib sound table although it's never used.
 	{0x3223E805u, "DSGDDTH3"},
 	{0x34962C4Au, "DSBONUS2"},
-	// Actually VICMARCH but used where WARMARCH and INTROCW3 is
-	{0x34E37DC5u, "WARMARCH"},
+	{0x34E37DC5u, "VICMARCH"},
 	{0x34FAC876u, "DSNAZIHT"},
 	{0x3570E2F0u, "DSGRTSIT"},
 	{0x3613AA1Du, "DSCGUN"},
@@ -221,12 +220,12 @@ static FSoundNameTable EliteHansSoundNames = {
 	// Music are loose WEM files in generic sound pack
 	{0x0736EF20u, "URAHERO"},
 	{0x0839C12Fu, "NAZI_RAP"},
-	{0x0E4330B6u, "NAZI_NOR"}, // Actually HITLWLTZ
+	{0x0E4330B6u, "HITLWLTZ"},
 	{0x11985AF6u, "SEARCHN"},
-	{0x137C718Bu, "NAZI_OMI"}, // Actually VICTORS
+	{0x137C718Bu, "VICTORS"},
 	{0x181A1A36u, "GETTHEM"},
 	{0x18AE34A1u, "PACMAN"},
-	{0x1A682365u, "WARMARCH"},
+	{0x1A682365u, "VICMARCH"},
 	{0x1A7D2BF6u, "SUSPENSE"},
 	{0x1D88A829u, "WONDERIN"},
 	{0x22E25169u, "ROSTER"},
@@ -270,12 +269,6 @@ static FSoundNameTable EliteHansSoundNames = {
 // mapping for
 static const std::map<std::string, const char*> LangMap = {
 	{"#str_wolfstone_curgame", "CURGAME"},
-	{"#str_wolfstone_episode1", "WL_EPISODE1"},
-	{"#str_wolfstone_episode2", "WL_EPISODE2"},
-	{"#str_wolfstone_episode3", "WL_EPISODE3"},
-	{"#str_wolfstone_episode4", "WL_EPISODE4"},
-	{"#str_wolfstone_episode5", "WL_EPISODE5"},
-	{"#str_wolfstone_episode6", "WL_EPISODE6"},
 
 	// The following are technically correctly named but ECWolf prefers them in
 	// a different form. So rename them to something else that isn't used.
@@ -302,6 +295,69 @@ static const std::map<std::string, const char*> LanguageCodes = {
 	{"spanish", "es"},
 	{"t_chinese", "cht"}
 };
+
+static const FString Mapinfo = R"EOF(
+gameinfo
+{
+	advisorypic = ""
+	pageindextext = ""
+	signon = ""
+	quitmessages = "$STR_QUITSUR"
+}
+)EOF";
+
+static const FString EliteHansEpisodes = R"EOF(clearepisodes
+
+episode "MAP01"
+{
+	lookup = "STR_EPISODE1"
+	picname = "M_EPIS1"
+	key = "E"
+}
+
+episode "MAP11"
+{
+	lookup = "STR_EPISODE2"
+	picname = "M_EPIS2"
+	key = "O"
+}
+)EOF";
+
+static const FString WolfstoneEpisodes = EliteHansEpisodes + R"EOF(
+episode "MAP21"
+{
+	lookup = "STR_EPISODE3"
+	picname = "M_EPIS3"
+	key = "D"
+}
+
+episode "MAP31"
+{
+	lookup = "STR_EPISODE4"
+	picname = "M_EPIS4"
+	key = "A"
+}
+
+episode "MAP41"
+{
+	lookup = "STR_EPISODE5"
+	picname = "M_EPIS5"
+	key = "T"
+}
+
+episode "MAP51"
+{
+	lookup = "STR_EPISODE6"
+	picname = "M_EPIS6"
+	key = "K"
+}
+)EOF";
+
+static const FString Sndinfo = R"EOF($musicalias HITLWLTZ NAZI_NOR
+$musicalias VICTORS NAZI_OMI
+$musicalias VICMARCH WARMARCH
+$musicalias VICMARCH INTROCW3
+)EOF";
 
 //using ResourceCollection = std::vector<std::unique_ptr<FResourceFile>>;
 struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
@@ -348,6 +404,7 @@ struct GameInfo
 	const char* Game;
 	const char* OutputName;
 	FSoundNameTable &SoundNames;
+	const FString &MapinfoEpisodes;
 	ResourceCollection (*LoadResources)(FString, FString);
 	uint16_t Date;
 };
@@ -366,6 +423,14 @@ struct MemoryLump : FResourceLump
 		Cache = (char*)Buffer.data();
 		RefCount = -1;
 		return -1;
+	}
+
+	static std::unique_ptr<MemoryLump> FromString(const char* str)
+	{
+		std::vector<uint8_t> data;
+		data.resize(strlen(str));
+		memcpy(data.data(), str, data.size());
+		return std::make_unique<MemoryLump>(std::move(data));
 	}
 };
 
@@ -388,11 +453,13 @@ template<typename ... T> // T should be FResourceLump but C++ doesn't have a nic
 static std::unique_ptr<FResourceLump> BuildECWolfArchive(const GameInfo &game, const ResourceCollection &resFiles, FResourceLump *langLump, T* ... soundResource)
 {
 	// We need to keep these around until we can make the FZip::Build call.
-	std::vector<std::unique_ptr<MemoryLump>> soundStorage;
+	std::vector<std::unique_ptr<MemoryLump>> lumpStorage;
 
 	FZip archive;
 	archive.SetDate(game.Date);
 	archive.AddFile("language.txt", langLump);
+	archive.AddFile("mapinfo.txt", lumpStorage.emplace_back(MemoryLump::FromString(game.MapinfoEpisodes + Mapinfo)).get());
+	archive.AddFile("sndinfo.txt", lumpStorage.emplace_back(MemoryLump::FromString(Sndinfo)).get());
 
 	auto readers = std::array<std::unique_ptr<FileReader>, sizeof...(soundResource)>{
 		std::unique_ptr<FileReader>{soundResource->NewReader()}...
@@ -409,7 +476,7 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(const GameInfo &game, c
 				sname = value->second;
 
 			char name[32];
-			archive.AddFile(MakeSoundFilename(name, 32, id, sname), soundStorage.emplace_back(std::make_unique<MemoryLump>(std::move(bank.Sounds[i].Data))).get());
+			archive.AddFile(MakeSoundFilename(name, 32, id, sname), lumpStorage.emplace_back(std::make_unique<MemoryLump>(std::move(bank.Sounds[i].Data))).get());
 		}
 	}
 
@@ -440,7 +507,7 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(const GameInfo &game, c
 					fflush(stdout);
 
 					char buf[32];
-					archive.AddFile(MakeSoundFilename(buf, 32, id, entry->second), soundStorage.emplace_back(std::make_unique<MemoryLump>(FSoundbank::ConvertWem(lump->CacheLump(), lump->LumpSize))).get());
+					archive.AddFile(MakeSoundFilename(buf, 32, id, entry->second), lumpStorage.emplace_back(std::make_unique<MemoryLump>(FSoundbank::ConvertWem(lump->CacheLump(), lump->LumpSize))).get());
 					lump->ReleaseCache();
 				}
 			}
@@ -530,10 +597,7 @@ static std::unique_ptr<FResourceLump> BuildLanguage(const ResourceCollection &re
 		}
 	}
 
-	std::vector<uint8_t> data;
-	data.resize(out.Len());
-	memcpy(data.data(), out.GetChars(), out.Len());
-	return std::make_unique<MemoryLump>(std::move(data));
+	return MemoryLump::FromString(out);
 }
 
 // Returns a list of installed languages, so that we can extract them all
@@ -740,6 +804,10 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 	zip.AddFile("vgagraph.wl6", resFiles.Find("vgagraph.wl6"));
 	zip.AddFile("vswap.wl6", resFiles.Find("vswap.wl6"));
 
+	// Add file for easy identification by contents
+	auto idLump = MemoryLump::FromString(FString(game.Game) +"\n\nExtracted from " + game.Name + " by WolfstoneExtract " TOOL_VERSION "\n");
+	zip.AddFile(FString(game.OutputName).Left(strlen(game.OutputName)-4) + ".txt", idLump.get());
+
 	switch(game.App)
 	{
 	case FileSys::APP_WolfensteinII:
@@ -772,8 +840,8 @@ static std::tuple<GameInfo, FString> PickGame()
 {
 	constexpr std::array<GameInfo, FileSys::NUM_STEAM_APPS> GameInfoTable
 	{
-		GameInfo{FileSys::APP_WolfensteinII, "Wolfenstein II", "Wolfstone 3D", "wolfstone.pk3", WolfstoneSoundNames, LoadWolfensteinIIResources, WOLFII_DATE},
-		GameInfo{FileSys::APP_WolfensteinYoungblood, "Wolfenstein: Youngblood", "Elite Hans: Die Neue Ordnung", "elitehans.pk3", EliteHansSoundNames, LoadYoungbloodResources, YOUNGBLOOD_DATE}
+		GameInfo{FileSys::APP_WolfensteinII, "Wolfenstein II", "Wolfstone 3D", "wolfstone.pk3", WolfstoneSoundNames, WolfstoneEpisodes, LoadWolfensteinIIResources, WOLFII_DATE},
+		GameInfo{FileSys::APP_WolfensteinYoungblood, "Wolfenstein: Youngblood", "Elite Hans: Die Neue Ordnung", "elitehans.pk3", EliteHansSoundNames, EliteHansEpisodes, LoadYoungbloodResources, YOUNGBLOOD_DATE}
 	};
 
 	TArray<std::tuple<GameInfo, FString>> candidates;
@@ -896,7 +964,7 @@ static Options ParseOptions(int argc, const char* const * argv)
 
 int main(int argc, char* argv[])
 {
-	printf("Wolfstone Data Extraction Utility 1.0\n");
+	printf("Wolfstone Data Extraction Utility " TOOL_VERSION "\n");
 
 	try
 	{
