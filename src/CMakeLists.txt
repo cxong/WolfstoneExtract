@@ -27,6 +27,10 @@ set_target_properties(wolfstoneextract PROPERTIES CXX_STANDARD 17)
 
 target_link_libraries(wolfstoneextract idCrypt ooz revorb ww2ogg)
 
+set_source_files_properties(main.cpp PROPERTIES COMPILE_DEFINITIONS "TOOL_VERSION=\"${PROJECT_VERSION}\"")
+
 if(MSVC)
 	target_compile_definitions(wolfstoneextract PUBLIC -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS)
 endif()
+
+install(TARGETS wolfstoneextract DESTINATION ${CMAKE_INSTALL_BINDIR})

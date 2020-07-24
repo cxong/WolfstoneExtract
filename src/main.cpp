@@ -16,8 +16,6 @@
 #include <memory>
 #include <vector>
 
-#define TOOL_VERSION "1.0"
-
 static const FString soundsPath = "sound" PATH_SEPARATOR "soundbanks" PATH_SEPARATOR "pc";
 
 // We can't rely on the data files providing a correct date so lets set all the

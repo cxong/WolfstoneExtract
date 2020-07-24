@@ -1,7 +1,7 @@
 // idCrypt v1.0 by emoose
 // Code licensed under GPL 3.0.
 
-#include <Windows.h>
+#include <windows.h>
 
 #include <bcrypt.h>
 #include <ncrypt.h>

@@ -18,7 +18,7 @@
 #ifdef _WIN32
 #include <tchar.h>
 #include <intrin.h>
-#include <Windows.h>
+#include <windows.h>
 #else
 #include "adapter.h"
 #endif

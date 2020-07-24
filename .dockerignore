@@ -1,0 +1,2 @@
+# Docker build context doesn't need to be aware of any files at this time.
+*
