@@ -993,6 +993,20 @@ static std::tuple<GameInfo, FString> PickGame(FString explicitPath)
 	return candidates[selection];
 }
 
+static void ShowHelp(Options&, const char* const *)
+{
+	puts(
+		"Usage: wolfstoneextract [options]\n"
+		"\n"
+		"Options:\n"
+		"    --help, -h : Displays this text.\n"
+		"    --language, -l <name> : Use game data for specified language instead of\n"
+		"                            English or whatever language may be installed.\n"
+		"    --path, -p <path> : Path to installed game skipping Steam detection.\n"
+	);
+	throw CNoRunExit();
+}
+
 static Options ParseOptions(int argc, const char* const * argv)
 {
 	struct OptHandlers
@@ -1003,7 +1017,8 @@ static Options ParseOptions(int argc, const char* const * argv)
 		void (*handler)(Options &opt, const char* const * argv);
 	};
 
-	const std::array<OptHandlers, 2> handlers {
+	const std::array<OptHandlers, 3> handlers {
+		OptHandlers{"help", 'h', 0, ShowHelp},
 		OptHandlers{
 			"language", 'l', 1, [](Options &opts, const char* const * argv){
 				opts.Language = argv[0];
@@ -1036,7 +1051,6 @@ static Options ParseOptions(int argc, const char* const * argv)
 				throw CFatalError("Command line switch takes arguments which are not present");
 
 			it->handler(opts, argv + i + 1);
-			argv += it->args;
 			i += it->args;
 		}
 		else
@@ -1059,7 +1073,6 @@ static Options ParseOptions(int argc, const char* const * argv)
 				else if(i + 1 < argc)
 				{
 					arg = argv[i+1];
-					++argv;
 					++i;
 				}
 				else
