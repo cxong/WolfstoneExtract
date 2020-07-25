@@ -9,7 +9,7 @@ class FileReaderBase
 {
 public:
 	virtual ~FileReaderBase() {}
-	virtual long Read (void *buffer, long len) = 0;
+	virtual long long Read (void *buffer, long long len) = 0;
 
 	FileReaderBase &operator>> (uint8_t &v)
 	{
@@ -52,15 +52,15 @@ public:
 	FileReader ();
 	FileReader (const char *filename);
 	FileReader (FILE *file);
-	FileReader (FILE *file, long length);
+	FileReader (FILE *file, long long length);
 	bool Open (const char *filename);
 	virtual ~FileReader ();
 
-	virtual long Tell () const;
-	virtual long Seek (long offset, int origin);
-	virtual long Read (void *buffer, long len);
+	virtual long long Tell () const;
+	virtual long Seek (long long offset, int origin);
+	virtual long long Read (void *buffer, long long len);
 	virtual char *Gets(char *strbuf, int len);
-	long GetLength () const { return Length; }
+	long long GetLength () const { return Length; }
 
 	// If you use the underlying FILE without going through this class,
 	// you must call ResetFilePtr() before using this class again.
@@ -104,17 +104,17 @@ public:
 
 
 protected:
-	FileReader (const FileReader &other, long length);
+	FileReader (const FileReader &other, long long length);
 
-	char *GetsFromBuffer(const char * bufptr, char *strbuf, int len);
+	char *GetsFromBuffer(const char * bufptr, char *strbuf, long long len);
 
 	FILE *File;
-	long Length;
-	long StartPos;
-	long FilePos;
+	long long Length;
+	long long StartPos;
+	long long FilePos;
 
 private:
-	long CalcFileLen () const;
+	long long CalcFileLen () const;
 protected:
 	bool CloseOnDestruct;
 };
@@ -125,9 +125,9 @@ public:
 	MemoryReader (const char *buffer, long length);
 	~MemoryReader ();
 
-	virtual long Tell () const;
-	virtual long Seek (long offset, int origin);
-	virtual long Read (void *buffer, long len);
+	virtual long long Tell () const;
+	virtual long Seek (long long offset, int origin);
+	virtual long long Read (void *buffer, long long len);
 	virtual char *Gets(char *strbuf, int len);
 	virtual const char *GetBuffer() const { return bufptr; }
 

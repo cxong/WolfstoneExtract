@@ -153,7 +153,7 @@ struct FIdclLump : public FResourceLump
 			if(Encrypted)
 			{
 				idCrypt_t crypt;
-				if(idCrypt(&crypt, cdata.get(), CompressedSize, FullName.GetChars(), true) != 0)
+				if(idCrypt(&crypt, cdata.get(), static_cast<long>(CompressedSize), FullName.GetChars(), true) != 0)
 					throw CFatalError("Decryption failed.");
 
 				memcpy(cdata.get(), crypt.cryptedText, crypt.cryptedTextSize);
@@ -312,7 +312,7 @@ bool FIdclFile<Ver>::Open(bool quiet)
 				realName = name;
 			lump.LumpNameSetup(realName);
 			lump.Owner = this;
-			lump.LumpSize = dirEntries[i].size;
+			lump.LumpSize = static_cast<int>(dirEntries[i].size);
 			lump.CompressedSize = dirEntries[i].compressedSize;
 			lump.Position = dirEntries[i].offset;
 			lump.Encrypted = encrypted;

@@ -47,6 +47,11 @@
 	throw CRecoverableError(buffer); \
 }
 
+#ifdef _WIN32
+#define ftell _ftelli64
+#define fseek _fseeki64
+#endif
+
 //==========================================================================
 //
 // FileReader
@@ -60,7 +65,7 @@ FileReader::FileReader ()
 {
 }
 
-FileReader::FileReader (const FileReader &other, long length)
+FileReader::FileReader (const FileReader &other, long long length)
 : File(other.File), Length(length), CloseOnDestruct(false)
 {
 	FilePos = StartPos = ftell (other.File);
@@ -81,7 +86,7 @@ FileReader::FileReader (FILE *file)
 	Length = CalcFileLen();
 }
 
-FileReader::FileReader (FILE *file, long length)
+FileReader::FileReader (FILE *file, long long length)
 : File(file), Length(length), CloseOnDestruct(true)
 {
 	FilePos = StartPos = ftell (file);
@@ -113,12 +118,12 @@ void FileReader::ResetFilePtr ()
 	FilePos = ftell (File);
 }
 
-long FileReader::Tell () const
+long long FileReader::Tell () const
 {
 	return FilePos - StartPos;
 }
 
-long FileReader::Seek (long offset, int origin)
+long FileReader::Seek (long long offset, int origin)
 {
 	if (origin == SEEK_SET)
 	{
@@ -140,7 +145,7 @@ long FileReader::Seek (long offset, int origin)
 	return -1;
 }
 
-long FileReader::Read (void *buffer, long len)
+long long FileReader::Read (void *buffer, long long len)
 {
 	assert(len >= 0);
 	if (len <= 0) return 0;
@@ -148,7 +153,7 @@ long FileReader::Read (void *buffer, long len)
 	{
 		len = Length - FilePos + StartPos;
 	}
-	len = (long)fread (buffer, 1, len, File);
+	len = fread (buffer, 1, len, File);
 	FilePos += len;
 	return len;
 }
@@ -159,7 +164,7 @@ char *FileReader::Gets(char *strbuf, int len)
 	char *p = fgets(strbuf, len, File);
 	if (p != NULL)
 	{
-		int old = FilePos;
+		auto old = FilePos;
 		FilePos = ftell(File);
 		if (FilePos - StartPos > Length)
 		{
@@ -169,7 +174,7 @@ char *FileReader::Gets(char *strbuf, int len)
 	return p;
 }
 
-char *FileReader::GetsFromBuffer(const char * bufptr, char *strbuf, int len)
+char *FileReader::GetsFromBuffer(const char * bufptr, char *strbuf, long long len)
 {
 	if (len>Length-FilePos) len=Length-FilePos;
 	if (len <= 0) return NULL;
@@ -199,9 +204,9 @@ char *FileReader::GetsFromBuffer(const char * bufptr, char *strbuf, int len)
 	return strbuf;
 }
 
-long FileReader::CalcFileLen() const
+long long FileReader::CalcFileLen() const
 {
-	long endpos;
+	long long endpos;
 
 	fseek (File, 0, SEEK_END);
 	endpos = ftell (File);
@@ -228,12 +233,12 @@ MemoryReader::~MemoryReader ()
 {
 }
 
-long MemoryReader::Tell () const
+long long MemoryReader::Tell () const
 {
 	return FilePos;
 }
 
-long MemoryReader::Seek (long offset, int origin)
+long MemoryReader::Seek (long long offset, int origin)
 {
 	switch (origin)
 	{
@@ -246,11 +251,11 @@ long MemoryReader::Seek (long offset, int origin)
 		break;
 
 	}
-	FilePos=std::clamp<long>(offset,0,Length);
+	FilePos=std::clamp<long long>(offset,0,Length);
 	return 0;
 }
 
-long MemoryReader::Read (void *buffer, long len)
+long long MemoryReader::Read (void *buffer, long long len)
 {
 	if (len>Length-FilePos) len=Length-FilePos;
 	if (len<0) len=0;

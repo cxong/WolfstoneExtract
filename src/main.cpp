@@ -446,7 +446,7 @@ struct MemoryLump : FResourceLump
 
 	MemoryLump(std::vector<uint8_t> &&data) : Buffer(std::move(data))
 	{
-		LumpSize = Buffer.size();
+		LumpSize = static_cast<int>(Buffer.size());
 	}
 
 	int FillCache()
@@ -955,7 +955,7 @@ static std::tuple<GameInfo, FString> PickGame()
 	{
 		printf("Select game to extract (0 to exit):\n");
 		int i = 1;
-		for(int i = 0; i < candidates.Size(); ++i)
+		for(unsigned int i = 0; i < candidates.Size(); ++i)
 			printf("    %d: %s\n", i+1, std::get<0>(candidates[i]).Game);
 
 		for(;;)
@@ -966,7 +966,7 @@ static std::tuple<GameInfo, FString> PickGame()
 			if(selection == -1)
 				throw CNoRunExit();
 
-			if(selection >= 0 && selection < candidates.Size())
+			if(selection >= 0 && static_cast<unsigned>(selection) < candidates.Size())
 				break;
 
 			// Flush any remaining input for the line
@@ -988,7 +988,7 @@ static Options ParseOptions(int argc, const char* const * argv)
 	{
 		const char* name;
 		char shortCode;
-		unsigned args;
+		int args;
 		void (*handler)(Options &opt, const char* const * argv);
 	};
 
@@ -1071,6 +1071,13 @@ int main(int argc, char* argv[])
 	catch(CDoomError &error)
 	{
 		fprintf(stderr, "\nFAILED: %s\n", error.GetMessage());
+
+#ifdef _WIN32
+		// Don't automatically close the window on Windows
+		fprintf(stderr, "An error has occured (press enter to dismiss)");
+		fseek(stdin, 0, SEEK_END);
+		getchar();
+#endif
 		return 1;
 	}
 
