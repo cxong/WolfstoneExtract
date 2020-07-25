@@ -4,7 +4,7 @@ if(POLICY CMP0091)
 	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-project(WolfstoneExtract
+project(wolfstoneextract
 	LANGUAGES CXX C
 	VERSION 1.0
 )
@@ -15,11 +15,11 @@ include(GNUInstallDirs)
 option(INSTALL_FLAT "Flatten install paths for loose packaging." OFF)
 if(INSTALL_FLAT)
 	set(CMAKE_INSTALL_BINDIR ".")
+	set(CMAKE_INSTALL_DOCDIR ".")
 endif()
 
 set(CPACK_PACKAGE_CONTACT "First Last <example@example.com>" CACHE STRING "Contact info for archive maintainer.")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Extraction tool for Wolfstone game data.\n Extracts Wolfstone 3D and Elite Hans from Steam installs of Wolfenstein II and\n Wolfenstein: Youngblood. Resulting files are formatted for use with ECWolf.")
-string(TOLOWER "${PROJECT_NAME}" CPACK_PACKAGE_NAME)
 # Use same prefix for packaging for consistency
 set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(CPACK_STRIP_FILES ON)
@@ -40,3 +40,6 @@ include(CPack)
 
 add_subdirectory(vendor)
 add_subdirectory(src)
+
+install(FILES COPYING DESTINATION "${CMAKE_INSTALL_DOCDIR}" RENAME copyright)
+install(FILES changelog README.md DESTINATION "${CMAKE_INSTALL_DOCDIR}")

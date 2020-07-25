@@ -6,6 +6,12 @@ This utility does not modify the game data in any way, merely extracts the data 
 
 ECWolf could be made to read the Wolfenstein II data files directly, but it is believed that most people would prefer extraction since 20MB of data is more portable than the 2.6GB of blobs that the game is contained in. Additionally since most of the data is in vanilla format having the data extracted is more useful for modding.
 
+## Running
+
+In most cases, after installing one of the supported games in Steam, this program can simply be run without providing any arguments. It will automatically scan for your Steam installation and prompt for what you wish to extract.
+
+If the tool fails to find your game data, the path to it can be explicitly provided with the --path argument. See --help for other options.
+
 ## Technical details
 
 Wolfenstein II actually uses vanilla Wolfenstein 3D data archives (gamemaps, vgagraph, vswap) to provide the levels and graphics for Wolfstone 3D. They're located in chunk_4.resources which is in a custom container format identified with the "IDCL" fourcc. While it does not appear that anyone has fully reverse engineered this container format, we do know enough about it to extract the Wolfstone data. Thus the implementation here is incomplete but good enough.
