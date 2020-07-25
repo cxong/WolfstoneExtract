@@ -425,6 +425,7 @@ struct ResourceCollection : std::vector<std::unique_ptr<FResourceFile>>
 struct Options
 {
 	FString Language;
+	FString Path;
 };
 
 struct GameInfo
@@ -930,13 +931,23 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 	printf("Done!\n");
 }
 
-static std::tuple<GameInfo, FString> PickGame()
+static std::tuple<GameInfo, FString> PickGame(FString explicitPath)
 {
 	constexpr std::array<GameInfo, FileSys::NUM_STEAM_APPS> GameInfoTable
 	{
 		GameInfo{FileSys::APP_WolfensteinII, "Wolfenstein II", "Wolfstone 3D", "wolfstone.pk3", WolfstoneSoundNames, WolfstoneEpisodes, WolfstoneScores, LoadWolfensteinIIResources, WOLFII_DATE},
 		GameInfo{FileSys::APP_WolfensteinYoungblood, "Wolfenstein: Youngblood", "Elite Hans: Die Neue Ordnung", "elitehans.pk3", EliteHansSoundNames, EliteHansEpisodes, EliteHansScores, LoadYoungbloodResources, YOUNGBLOOD_DATE}
 	};
+
+	if(explicitPath.IsNotEmpty())
+	{
+		if(File(explicitPath, "base/gameresources.resources").exists())
+			return {GameInfoTable[0], explicitPath};
+		else if(File(explicitPath, "base/gameresources_pc.resources").exists())
+			return {GameInfoTable[1], explicitPath};
+		else
+			throw CFatalError("Explicitly provided path does not appear to contain the expected game files.");
+	}
 
 	TArray<std::tuple<GameInfo, FString>> candidates;
 	for(GameInfo game : GameInfoTable)
@@ -992,10 +1003,15 @@ static Options ParseOptions(int argc, const char* const * argv)
 		void (*handler)(Options &opt, const char* const * argv);
 	};
 
-	const std::array<OptHandlers, 1> handlers {
-		{
+	const std::array<OptHandlers, 2> handlers {
+		OptHandlers{
 			"language", 'l', 1, [](Options &opts, const char* const * argv){
 				opts.Language = argv[0];
+			}
+		},
+		OptHandlers{
+			"path", 'p', 1, [](Options &opts, const char* const * argv){
+				opts.Path = argv[0];
 			}
 		}
 	};
@@ -1025,14 +1041,15 @@ static Options ParseOptions(int argc, const char* const * argv)
 		}
 		else
 		{
-			char name = argv[i][2];
+			char name = argv[i][1];
 			auto it = std::find_if(handlers.cbegin(), handlers.cend(), [name](OptHandlers const &opt) {
 				return opt.shortCode && opt.shortCode == name;
 			});
-			assert(it->args <= 1);
 
 			if(it == handlers.end())
 				throw CFatalError("Unknown command line switch");
+
+			assert(it->args <= 1);
 
 			const char* arg;
 			if(it->args)
@@ -1064,7 +1081,7 @@ int main(int argc, char* argv[])
 	{
 		auto opts = ParseOptions(argc, argv);
 
-		auto [ game, path ] = PickGame();
+		auto [ game, path ] = PickGame(opts.Path);
 		Extract(game, path, opts.Language);
 	}
 	catch(CNoRunExit&) {}
