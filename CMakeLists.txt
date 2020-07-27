@@ -6,7 +6,7 @@ endif()
 
 project(wolfstoneextract
 	LANGUAGES CXX C
-	VERSION 1.0
+	VERSION 1.1
 )
 
 

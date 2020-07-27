@@ -352,10 +352,10 @@ episode "MAP51"
 }
 )EOF";
 
-static const FString Sndinfo = R"EOF($musicalias HITLWLTZ NAZI_NOR
-$musicalias VICTORS NAZI_OMI
-$musicalias VICMARCH WARMARCH
-$musicalias VICMARCH INTROCW3
+static const FString Sndinfo = R"EOF($musicalias NAZI_NOR HITLWLTZ
+$musicalias NAZI_OMI VICTORS
+$musicalias WARMARCH VICMARCH
+$musicalias INTROCW3 VICMARCH
 )EOF";
 
 struct HighScore

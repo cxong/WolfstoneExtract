@@ -1,3 +1,9 @@
+wolfstoneextract (1.1) stable; urgency=medium
+
+  * Reverse musicalias definitions to match correct form.
+
+ -- Braden Obrzut <admin@maniacsvault.net>  Mon, 27 Jul 2020 01:04:00 -0500
+
 wolfstoneextract (1.0) stable; urgency=low
 
   * Initial release.
