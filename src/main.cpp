@@ -988,13 +988,12 @@ static std::tuple<GameInfo, FString> PickGame(FString explicitPath)
 
 	if(candidates.size() > 1)
 	{
-		printf("Select game to extract (0 to exit):\n");
 		for(unsigned int i = 0; i < candidates.size(); ++i)
 			printf("    %d: %s\n", i+1, std::get<0>(candidates[i]).Game);
 
 		for(;;)
 		{
-			printf("? ");
+			printf("Which game # to extract (0 to exit)? ");
 			fflush(stdout);
 			selection = getchar() - '1';
 			if(selection == -1)

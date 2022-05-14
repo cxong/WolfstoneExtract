@@ -10,7 +10,7 @@ ECWolf could be made to read the Wolfenstein II data files directly, but it is b
 
 In most cases, after installing one of the supported games in Steam, this program can simply be run without providing any arguments. It will automatically scan for your Steam installation and prompt for what you wish to extract.
 
-If the tool fails to find your game data, the path to it can be explicitly provided with the --path argument. See --help for other options.
+If the tool fails to find your game data, the path to it can be explicitly provided by running from the command prompt/terminal and passing the --path argument. See --help for other options.
 
 ## Technical details
 

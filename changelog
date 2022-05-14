@@ -1,3 +1,15 @@
+wolfstoneextract (1.2) stable; urgency=medium
+
+  * Added script to ecwolf.wl6 which changes pushwall movement to three tiles.
+    The engine in Wolfstone 3D/Elite Hans doesn't fix the three tile pushwall
+    movement at 70fps, but instead modifies some of the maps to account for
+    it. More importantly, while Wolfstone 3D does not depend on it, the levels
+    in Elite Hans are designed around three tile pushwall movement.
+  * Fixed issues with optimizing ooz on recent compilers.
+  * Minor adjustments in wording to clarify usage.
+
+ -- Braden Obrzut <admin@maniacsvault.net>  Fri, 13 May 2022 23:01:00 -0500
+
 wolfstoneextract (1.1) stable; urgency=medium
 
   * Reverse musicalias definitions to match correct form.
