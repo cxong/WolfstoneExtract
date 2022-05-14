@@ -39,6 +39,7 @@
 #include "resourcefile.h"
 
 #include <algorithm>
+#include <limits>
 #include <memory>
 
 #include <idCrypt.h>

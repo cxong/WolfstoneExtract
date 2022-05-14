@@ -302,6 +302,7 @@ gameinfo
 	pageindextext = ""
 	signon = ""
 	quitmessages = "$STR_QUITSUR"
+	translator = "pushwall.txt"
 }
 )EOF";
 
@@ -356,6 +357,22 @@ static const FString Sndinfo = R"EOF($musicalias NAZI_NOR HITLWLTZ
 $musicalias NAZI_OMI VICTORS
 $musicalias WARMARCH VICMARCH
 $musicalias INTROCW3 VICMARCH
+)EOF";
+
+static const FString PushwallXlat = R"EOF(include "$base"
+
+things
+{
+	trigger 98
+	{
+		action = "Pushwall_Move";
+		arg1 = 8;
+		arg2 = 2;
+		arg3 = 3;
+		playeruse = true;
+		secret = true;
+	}
+}
 )EOF";
 
 struct HighScore
@@ -491,6 +508,7 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(const GameInfo &game, c
 	archive.SetDate(game.Date);
 	archive.AddFile("language.txt", langLump);
 	archive.AddFile("mapinfo.txt", lumpStorage.emplace_back(MemoryLump::FromString(game.MapinfoEpisodes + Mapinfo)).get());
+	archive.AddFile("pushwall.txt", lumpStorage.emplace_back(MemoryLump::FromString(PushwallXlat)).get());
 	archive.AddFile("sndinfo.txt", lumpStorage.emplace_back(MemoryLump::FromString(Sndinfo)).get());
 
 	auto readers = std::array<std::unique_ptr<FileReader>, sizeof...(soundResource)>{
@@ -617,9 +635,13 @@ static FString ConvertLanguage(const char* langCode, FResourceLump *langLump)
 	constexpr static const uint8_t utf8ByteOrderMark[3] = {0xEF, 0xBB, 0xBF};
 
 	const char* langData = static_cast<char*>(langLump->CacheLump());
-	if(langLump->LumpSize >= sizeof(utf8ByteOrderMark) && memcmp(langData, utf8ByteOrderMark, sizeof(utf8ByteOrderMark)) == 0)
+	auto langSize = static_cast<size_t>(langLump->LumpSize);
+	if(langSize >= sizeof(utf8ByteOrderMark) && memcmp(langData, utf8ByteOrderMark, sizeof(utf8ByteOrderMark)) == 0)
+	{
 		langData += sizeof(utf8ByteOrderMark);
-	Scanner sc{langData, static_cast<size_t>(langLump->LumpSize)};
+		langSize -= sizeof(utf8ByteOrderMark);
+	}
+	Scanner sc{langData, langSize};
 	langLump->ReleaseCache();
 
 	FString out = FString("[") + langCode + "]\n";
