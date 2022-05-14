@@ -39,7 +39,7 @@ inline SCString_Index SCString_IndexOfSeq(const SCString &obj, const SCString &s
 inline void SCString_InsertChar(SCString &obj, SCString_Index pos, const char chr) { obj.Insert(pos, &chr, 1); }
 inline void SCString_ReplaceChar(SCString &obj, SCString_Index pos, const char chr) { obj.Remove(pos, 1); obj.Insert(pos, &chr, 1); }
 inline SCString_Index SCString_Len(const SCString &obj) { return static_cast<SCString_Index>(obj.Len()); }
-inline SCString_Index SCString_NPos(const SCString &obj) { return -1; }
+inline SCString_Index SCString_NPos(const SCString &) { return -1; }
 inline void SCString_Unescape(SCString &obj, SCString_Index pos, const char chr) { obj = obj.Left(pos) + chr + obj.Mid(pos+2); }
 
 #endif

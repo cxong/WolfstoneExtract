@@ -34,8 +34,6 @@
 
 #pragma once
 
-#include "tarray.h"
-
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -56,5 +54,5 @@ struct FSoundbank
 
 	static std::vector<uint8_t> ConvertWem(void* data, unsigned int length);
 
-	TArray<Entry> Sounds;
+	std::vector<Entry> Sounds;
 };

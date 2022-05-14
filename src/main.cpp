@@ -518,7 +518,7 @@ static std::unique_ptr<FResourceLump> BuildECWolfArchive(const GameInfo &game, c
 	for(auto& reader : readers)
 	{
 		FSoundbank bank(reader.get());
-		for(unsigned int i = 0; i < bank.Sounds.Size(); ++i)
+		for(unsigned int i = 0; i < bank.Sounds.size(); ++i)
 		{
 			uint32_t id = bank.Sounds[i].Id;
 			const char* sname = "";
@@ -691,7 +691,7 @@ static std::unique_ptr<FResourceLump> BuildLanguage(const ResourceCollection &re
 
 	FString out;
 
-	for(const auto [lang, lump] : stringsLumps)
+	for(const auto &[lang, lump] : stringsLumps)
 	{
 		// Not sure why this is in the strings/ directory
 		if(lang == "shadowplay")
@@ -795,7 +795,7 @@ static ResourceCollection LoadPatchedResource(File file)
 			if(result.ec != std::errc())
 				continue;
 
-			if(fileList.size() <= num)
+			if(fileList.size() <= static_cast<unsigned int>(num))
 				fileList.resize(num+1);
 			fileList[num] = file.getDirectory() + PATH_SEPARATOR + candidate;
 		}
@@ -935,6 +935,8 @@ static void Extract(GameInfo game, FString wolfpath, FString language)
 		zip.AddFile("demo2.wl6", resFiles.Find("demo2.wl6"));
 		zip.AddFile("demo3.wl6", resFiles.Find("demo3.wl6"));
 		break;
+	default:
+		break;
 	}
 
 	if(auto f = File(game.OutputName).open("wb"))
@@ -971,24 +973,23 @@ static std::tuple<GameInfo, FString> PickGame(FString explicitPath)
 			throw CFatalError("Explicitly provided path does not appear to contain the expected game files.");
 	}
 
-	TArray<std::tuple<GameInfo, FString>> candidates;
+	std::vector<std::tuple<GameInfo, FString>> candidates;
 	for(GameInfo game : GameInfoTable)
 	{
 		auto path = FileSys::GetSteamPath(game.App);
 		if(path.IsNotEmpty())
-			candidates.Push({game, path});
+			candidates.emplace_back(game, path);
 	}
 
-	if(candidates.Size() == 0)
+	if(candidates.size() == 0)
 		throw CFatalError("Could not find installed Wolfenstein II or Youngblood game data.");
 
 	int selection = 0;
 
-	if(candidates.Size() > 1)
+	if(candidates.size() > 1)
 	{
 		printf("Select game to extract (0 to exit):\n");
-		int i = 1;
-		for(unsigned int i = 0; i < candidates.Size(); ++i)
+		for(unsigned int i = 0; i < candidates.size(); ++i)
 			printf("    %d: %s\n", i+1, std::get<0>(candidates[i]).Game);
 
 		for(;;)
@@ -999,7 +1000,7 @@ static std::tuple<GameInfo, FString> PickGame(FString explicitPath)
 			if(selection == -1)
 				throw CNoRunExit();
 
-			if(selection >= 0 && static_cast<unsigned>(selection) < candidates.Size())
+			if(selection >= 0 && static_cast<unsigned>(selection) < candidates.size())
 				break;
 
 			// Flush any remaining input for the line
@@ -1060,7 +1061,6 @@ static Options ParseOptions(int argc, const char* const * argv)
 		if(strlen(argv[i]) < 2 || argv[i][0] != '-')
 			throw CFatalError("Invalid command line arguments");
 
-		decltype(handlers)::const_iterator it;
 		if(argv[i][1] == '-')
 		{
 			const char* name = argv[i]+2;

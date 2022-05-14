@@ -199,13 +199,13 @@ void FreeAligned(void *p) {
 }
 
 uint32 BSR(uint32 x) {
-  unsigned long index;
+  unsigned long index = ~0u;
   _BitScanReverse(&index, x);
   return index;
 }
 
 uint32 BSF(uint32 x) {
-  unsigned long index;
+  unsigned long index = ~0u;
   _BitScanForward(&index, x);
   return index;
 }
@@ -313,7 +313,7 @@ int BitReader_ReadGamma(BitReader *bits) {
 }
 
 int CountLeadingZeros(uint32 bits) {
-  unsigned long x;
+  unsigned long x = 32;
   _BitScanReverse(&x, bits);
   return 31 - x;
 }
@@ -389,7 +389,7 @@ uint32 BitReader_ReadDistanceB(BitReader *bits, uint32 v) {
 
 // Reads a length code.
 bool BitReader_ReadLength(BitReader *bits, uint32 *v) {
-  unsigned long bitresult;
+  unsigned long bitresult = 32;
   int n;
   uint32 rv;
   _BitScanReverse(&bitresult, bits->bits);
@@ -409,7 +409,7 @@ bool BitReader_ReadLength(BitReader *bits, uint32 *v) {
 
 // Reads a length code, backwards.
 bool BitReader_ReadLengthB(BitReader *bits, uint32 *v) {
-  unsigned long bitresult;
+  unsigned long bitresult = 32;
   int n;
   uint32 rv;
   _BitScanReverse(&bitresult, bits->bits);
@@ -438,7 +438,8 @@ int Log2RoundUp(uint32 v) {
 }
 
 #define ALIGN_16(x) (((x)+15)&~15)
-#define COPY_64(d, s) {*(uint64*)(d) = *(uint64*)(s); }
+// This used to be "{*(uint64*)(d) = *(uint64*)(s); }" but that breaks GCC auto-vectorization
+#define COPY_64(d, s) { memcpy(d, s, 8); }
 #define COPY_64_BYTES(d, s) {                                                 \
         _mm_storeu_si128((__m128i*)d + 0, _mm_loadu_si128((__m128i*)s + 0));  \
         _mm_storeu_si128((__m128i*)d + 1, _mm_loadu_si128((__m128i*)s + 1));  \
@@ -930,7 +931,7 @@ bool DecodeGolombRiceLengths(uint8 *dst, size_t size, BitReader2 *br) {
   int bitpos = 0;
   if (!(v & 1)) {
     p--;
-    unsigned long q;
+    unsigned long q = 9;
     _BitScanForward(&q, v);
     bitpos = 8 - q;
   }
@@ -1048,7 +1049,7 @@ int Huff_ConvertToRanges(HuffRange *range, int num_symbols, int P, const uint8 *
 int Huff_ReadCodeLengthsNew(BitReader *bits, uint8 *syms, uint32 *code_prefix) {
   int forced_bits = BitReader_ReadBitsNoRefill(bits, 2);
 
-  int num_symbols = BitReader_ReadBitsNoRefill(bits, 8) + 1;
+  unsigned int num_symbols = BitReader_ReadBitsNoRefill(bits, 8) + 1;
 
   int fluff = BitReader_ReadFluff(bits, num_symbols);
 
@@ -1074,8 +1075,7 @@ int Huff_ReadCodeLengthsNew(BitReader *bits, uint8 *syms, uint32 *code_prefix) {
 
   if (1) {
     uint running_sum = 0x1e;
-    int maxlen = 11;
-    for (int i = 0; i < num_symbols; i++) {
+    for (uint i = 0; i < num_symbols; i++) {
       int v = code_len[i];
       v = -(int)(v & 1) ^ (v >> 1);
       code_len[i] = v + (running_sum >> 2) + 1;
@@ -1690,7 +1690,7 @@ bool Tans_DecodeTable(BitReader *bits, int L_bits, TansData *tans_data) {
     uint32 L = 1 << L_bits;
     uint8 *cur_rice_ptr = rice;
     int average = 6;
-    int somesum = 0;
+    uint32 somesum = 0;
     uint8 *tanstable_A = tans_data->A;
     uint32 *tanstable_B = tans_data->B;
 
@@ -1743,8 +1743,8 @@ bool Tans_DecodeTable(BitReader *bits, int L_bits, TansData *tans_data) {
     uint8 *tanstable_A = tans_data->A;
     uint32 *tanstable_B = tans_data->B;
 
-    int weight = 0;
-    int total_weights = 0;
+    uint32 weight = 0;
+    uint32 total_weights = 0;
 
     do {
       BitReader_Refill(bits);
@@ -1828,7 +1828,7 @@ void Tans_InitLut(TansData *tans_data, int L_bits, TansLutEnt *lut) {
 
   // Setup the entrys with weight >= 2
   int weights_sum = 0;
-  for (int i = 0; i < tans_data->B_used; i++) {
+  for (uint32 i = 0; i < tans_data->B_used; i++) {
     int weight = tans_data->B[i] & 0xffff;
     int symbol = tans_data->B[i] >> 16;
     if (weight > 4) {
@@ -2121,7 +2121,7 @@ int Kraken_GetBlockSize(const uint8 *src, const uint8 *src_end, int *dest_size, 
 
 int Kraken_DecodeBytes(byte **output, const byte *src, const byte *src_end, int *decoded_size, size_t output_size, bool force_memmove, uint8 *scratch, uint8 *scratch_end) {
   const byte *src_org = src;
-  int src_size, dst_size;
+  size_t src_size, dst_size;
 
   if (src_end - src < 2)
     return -1; // too few bytes
@@ -2140,7 +2140,7 @@ int Kraken_DecodeBytes(byte **output, const byte *src, const byte *src_end, int 
         return -1; // reserved bits must not be set
       src += 3;
     }
-    if (src_size > output_size || src_end - src < src_size)
+    if (src_size > output_size || static_cast<size_t>(src_end - src) < src_size)
       return -1;
     *decoded_size = src_size;
     if (force_memmove)
@@ -2172,19 +2172,19 @@ int Kraken_DecodeBytes(byte **output, const byte *src, const byte *src_end, int 
       return -1;
     src += 5;
   }
-  if (src_end - src < src_size || dst_size > output_size)
+  if (static_cast<size_t>(src_end - src) < src_size || dst_size > output_size)
     return -1;
 
   uint8 *dst = *output;
   if (dst == scratch) {
-    if (scratch_end - scratch < dst_size)
+    if (static_cast<size_t>(scratch_end - scratch) < dst_size)
       return -1;
     scratch += dst_size;
   }
 
 //  printf("%d -> %d (%d)\n", src_size, dst_size, chunk_type);
 
-  int src_used = -1;
+  size_t src_used = -1;
   switch (chunk_type) {
   case 2:
   case 4:
@@ -3385,7 +3385,6 @@ int Leviathan_DecodeQuantum(byte *dst, byte *dst_end, byte *dst_start,
 }
 
 
-
 int Mermaid_DecodeFarOffsets(const byte *src, const byte *src_end, uint32 *output, size_t output_size, int64 offset) {
   const byte *src_cur = src;
   size_t i;
@@ -4023,7 +4022,7 @@ bool Kraken_DecodeStep(struct KrakenDecoder *dec,
   const byte *src_in = src;
   const byte *src_end = src + src_bytes_left;
   KrakenQuantumHeader qhdr;
-  int n;
+  uint32 n;
 
   if ((offset & 0x3FFFF) == 0) {
     src = Kraken_ParseHeader(&dec->hdr, src);
@@ -4033,10 +4032,10 @@ bool Kraken_DecodeStep(struct KrakenDecoder *dec,
 
   bool is_kraken_decoder = (dec->hdr.decoder_type == 6 || dec->hdr.decoder_type == 10 || dec->hdr.decoder_type == 12);
 
-  int dst_bytes_left = (int)Min(is_kraken_decoder ? 0x40000 : 0x4000, dst_bytes_left_in);
+  size_t dst_bytes_left = Min(is_kraken_decoder ? 0x40000 : 0x4000, dst_bytes_left_in);
 
   if (dec->hdr.uncompressed) {
-    if (src_end - src < dst_bytes_left) {
+    if (static_cast<size_t>(src_end - src) < dst_bytes_left) {
       dec->src_used = dec->dst_used = 0;
       return true;
     }
@@ -4164,7 +4163,7 @@ byte *load_file(const char *filename, int *size) {
   FILE *f = fopen(filename, "rb");
   if (!f) error("file open error", filename);
   fseek(f, 0, SEEK_END);
-  int packed_size = ftell(f);
+  size_t packed_size = ftell(f);
   fseek(f, 0, SEEK_SET);
   byte *input = new byte[packed_size];
   if (!input) error("memory error", filename);

@@ -147,7 +147,7 @@ FSoundbank::FSoundbank(FileReader *reader)
 			throw CRecoverableError("Missing BKHD fourcc");
 		foundFourCC = true;
 
-		chunkMap[section.Id] = {offset, section.Length};
+		chunkMap[section.Id] = {.Offset = offset, .Length = section.Length, .Id = 0, .Data = {}};
 
 		offset += section.Length + sizeof(section);
 		reader->Seek(section.Length, SEEK_CUR);
@@ -194,7 +194,7 @@ FSoundbank::FSoundbank(FileReader *reader)
 			reader->Seek(obj.Length-4, SEEK_CUR);
 	}
 
-	Sounds.Resize(indexChunk->Length/sizeof(FSbIndex));
+	Sounds.resize(indexChunk->Length/sizeof(FSbIndex));
 	reader->Seek(indexChunk->Offset, SEEK_SET);
 	for(unsigned int i = 0; i < indexChunk->Length/sizeof(FSbIndex); ++i)
 	{
@@ -213,13 +213,13 @@ FSoundbank::FSoundbank(FileReader *reader)
 			wemToSoundId[index.WemId] = index.WemId;
 		//printf("%u: WemId = %X, Offset = %u, Length = %u; Sound Id = %X\n", i, index.WemId, index.Offset, index.Length, wemToSoundId[index.WemId]);
 
-		Sounds[i] = {dataChunk->Offset + index.Offset, index.Length, wemToSoundId[index.WemId]};
+		Sounds[i] = {.Offset = dataChunk->Offset + index.Offset, .Length = index.Length, .Id = wemToSoundId[index.WemId], .Data = {}};
 	}
 
 	printf("Processing sound bank ");
-	for(unsigned int i = 0; i < Sounds.Size(); ++i)
+	for(unsigned int i = 0; i < Sounds.size(); ++i)
 	{
-		printf("[%5d/%5d]\b\b\b\b\b\b\b\b\b\b\b\b\b", i+1, Sounds.Size());
+		printf("[%5u/%5u]\b\b\b\b\b\b\b\b\b\b\b\b\b", i+1, static_cast<unsigned int>(Sounds.size()));
 		fflush(stdout);
 
 		auto& sound = Sounds[i];

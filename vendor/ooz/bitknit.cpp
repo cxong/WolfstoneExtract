@@ -343,7 +343,8 @@ size_t Bitknit_Decode(const byte *src, const byte *src_end, byte *dst, byte *dst
     RENORMALIZE();
 
     if (sym < 256) {
-      *dst++ = sym + dst[last_match_negative];
+      *dst = sym + dst[last_match_negative];
+      ++dst;
 
       if (dst + 4 >= dst_end)
         break;
@@ -352,7 +353,8 @@ size_t Bitknit_Decode(const byte *src, const byte *src_end, byte *dst, byte *dst
       RENORMALIZE();
 
       if (sym < 256) {
-        *dst++ = sym + dst[last_match_negative];
+        *dst = sym + dst[last_match_negative];
+        ++dst;
         continue;
       }
     }
@@ -385,9 +387,9 @@ size_t Bitknit_Decode(const byte *src, const byte *src_end, byte *dst, byte *dst
 
     } else {
       size_t idx = (recent_dist_mask >> (3 * sym)) & 7;
-      uint32 mask = ~7 << (3 * sym);
+      uint32 mask = ~7u << (3 * sym);
       match_dist = bk->recent_dist[idx];
-      recent_dist_mask = (recent_dist_mask & mask) | (idx + 8 * recent_dist_mask) & ~mask;
+      recent_dist_mask = ((recent_dist_mask & mask) | (idx + 8 * recent_dist_mask)) & ~mask;
     }
     
     if (match_dist >= 8) {

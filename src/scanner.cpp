@@ -312,6 +312,7 @@ bool Scanner::GetNextString()
 				case ',':
 					if(scanPos == start)
 						break;
+					[[fallthrough]];
 				case ' ':
 				case '\t':
 				case '\n':
