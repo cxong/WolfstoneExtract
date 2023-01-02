@@ -977,6 +977,8 @@ static std::tuple<GameInfo, FString> PickGame(FString explicitPath)
 	for(GameInfo game : GameInfoTable)
 	{
 		auto path = FileSys::GetSteamPath(game.App);
+		if(path.IsEmpty())
+			path = FileSys::GetGOGPath(game.App);
 		if(path.IsNotEmpty())
 			candidates.emplace_back(game, path);
 	}

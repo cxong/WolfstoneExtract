@@ -38,9 +38,9 @@
 #define USE_WINDOWS_BOOLEAN
 #include <windows.h>
 #undef ERROR
-#else
-#include "sys/stat.h"
 #endif
+#include <sys/stat.h>
+#include <array>
 
 #include "doomerrors.h"
 #include "filesys_steam.h"
@@ -48,11 +48,13 @@
 #include "scanner.h"
 #include "tarray.h"
 
-#include <array>
-
 namespace FileSys {
 
 #ifdef _WIN32
+#ifndef S_ISDIR
+#define S_ISDIR(mode) (((mode) & _S_IFMT) == _S_IFDIR)
+#endif
+
 /*
 ** Bits and pieces
 **
@@ -97,8 +99,32 @@ static bool QueryPathKey(HKEY key, const char *keypath, const char *valname, FSt
 	}
 	return value.IsNotEmpty();
 }
-#else
-static TMap<int, FString> SteamAppInstallPath;
+
+// Previously Steam only allowed one steam library based on where Steam was installed
+static FString QuerySteamappsPath()
+{
+	//==========================================================================
+	//
+	// I_GetSteamPath
+	//
+	// Check the registry for the path to Steam, so that we can search for
+	// IWADs that were bought with Steam.
+	//
+	//==========================================================================
+
+	FString path;
+	if (!QueryPathKey(HKEY_CURRENT_USER, "Software\\Valve\\Steam", "SteamPath", path))
+	{
+		if (!QueryPathKey(HKEY_LOCAL_MACHINE, "Software\\Valve\\Steam", "InstallPath", path))
+			path = "";
+	}
+	if (!path.IsEmpty())
+		path += "\\SteamApps";
+
+	return path;
+}
+#endif
+
 static void PSR_FindEndBlock(Scanner &sc)
 {
 	int depth = 1;
@@ -145,6 +171,7 @@ static bool PSR_FindAndEnterBlock(Scanner &sc, const char* keyword)
 	return false;
 }
 
+#ifndef _WIN32
 static TArray<FString> PSR_ReadBaseInstalls(Scanner &sc)
 {
 	TArray<FString> result;
@@ -215,8 +242,134 @@ static TArray<FString> ParseSteamRegistry(const char* path)
 
 	return dirs;
 }
+#else
+static TArray<FString> ParseSteamLibraryFolders(const char* path)
+{
+	TArray<FString> dirs;
+
+	char* data;
+	long size;
+
+	// Read registry data
+	FILE* registry = File(path).open("rb");
+	if(!registry)
+		return dirs;
+
+	fseek(registry, 0, SEEK_END);
+	size = ftell(registry);
+	fseek(registry, 0, SEEK_SET);
+	data = new char[size];
+	fread(data, 1, size, registry);
+	fclose(registry);
+
+	Scanner sc(data, size);
+	delete[] data;
+
+	// Find the SteamApps listing
+	if(PSR_FindAndEnterBlock(sc, "libraryfolders"))
+	{
+		while(!sc.CheckToken('}'))
+		{
+			sc.MustGetToken(TK_StringConst);
+			sc.MustGetToken('{');
+			while(sc.TokensLeft())
+			{
+				if(sc.CheckToken('}'))
+					break;
+
+				sc.MustGetToken(TK_StringConst);
+				FString key(sc->str);
+				if(key.CompareNoCase("path") == 0)
+				{
+					sc.MustGetToken(TK_StringConst);
+					dirs.Push(sc->str + "\\steamapps\\common");
+				}
+				else
+				{
+					if(sc.CheckToken('{'))
+						PSR_FindEndBlock(sc);
+					else
+						sc.MustGetToken(TK_StringConst);
+				}
+			}
+		}
+	}
+
+	return dirs;
+}
 #endif
 
+static TArray<FString> GetSteamLibraryFolders()
+{
+	TArray<FString> SteamInstallFolders;
+
+#if defined(_WIN32)
+	FString SteamappsPath = QuerySteamappsPath();
+	if (SteamappsPath.IsEmpty())
+		return TArray<FString>();
+
+	try
+	{
+		SteamInstallFolders = ParseSteamLibraryFolders(SteamappsPath + "\\libraryfolders.vdf");
+	}
+	catch (class CDoomError& error)
+	{
+		// Ignore since we have a fallback
+	}
+
+	if (SteamInstallFolders.Size() == 0)
+		SteamInstallFolders.Push(SteamappsPath + "\\common");
+	return SteamInstallFolders;
+#elif defined(__APPLE__)
+	FString appSupportPath = OSX_FindFolder(DIR_ApplicationSupport);
+	FString regPath = appSupportPath + "/Steam/config/config.vdf";
+	try
+	{
+
+		SteamInstallFolders = ParseSteamRegistry(regPath);
+	}
+	catch (class CDoomError& error)
+	{
+		// If we can't parse for some reason just pretend we can't find anything.
+		return TArray<FString>();
+	}
+
+	SteamInstallFolders.Push(appSupportPath + "/Steam/SteamApps/common");
+#else
+	char* home = getenv("HOME");
+	if (home != NULL && *home != '\0')
+	{
+		// [BL] The config seems to have moved from the more modern .local to
+		// .steam at some point. Not sure if it's just my setup so I guess we
+		// can fall back on it?
+		auto attemptPaths = std::array<FString, 2>{"/.steam/config/config.vdf", "/.local/share/Steam/config/config.vdf"};
+		for(auto regPath : attemptPaths)
+		{
+			regPath = FString(home) + regPath;
+			try
+			{
+				SteamInstallFolders = ParseSteamRegistry(regPath);
+				break;
+			}
+			catch(class CDoomError &error)
+			{
+			}
+		}
+		if(SteamInstallFolders.Size() == 0)
+		{
+			// If we can't parse for some reason just pretend we can't find anything.
+			return TArray<FString>();
+		}
+
+		auto regPath = FString(home) + "/.local/share/Steam/SteamApps/common";
+		SteamInstallFolders.Push(regPath);
+	}
+#endif
+
+	return SteamInstallFolders;
+}
+
+static TMap<int, FString> SteamAppInstallPath;
 FString GetSteamPath(ESteamApp game)
 {
 	static struct SteamAppInfo
@@ -229,98 +382,72 @@ FString GetSteamPath(ESteamApp game)
 		{"Wolfenstein Youngblood", 1056960}
 	};
 
-#if defined(_WIN32)
-	FString path;
-
-	//==========================================================================
-	//
-	// I_GetSteamPath
-	//
-	// Check the registry for the path to Steam, so that we can search for
-	// IWADs that were bought with Steam.
-	//
-	//==========================================================================
-
-	if (!QueryPathKey(HKEY_CURRENT_USER, "Software\\Valve\\Steam", "SteamPath", path))
-	{
-		if(!QueryPathKey(HKEY_LOCAL_MACHINE, "Software\\Valve\\Steam", "InstallPath", path))
-			path = "";
-	}
-	if(!path.IsEmpty())
-		path += "\\SteamApps\\common";
-
-	if(path.IsEmpty())
-		return path;
-
-	return path + PATH_SEPARATOR + AppInfo[game].BasePath;
-#else
 	// Linux and OS X actually allow the user to install to any location, so
 	// we need to figure out on an app-by-app basis where the game is installed.
 	// To do so, we read the virtual registry.
 	if(SteamAppInstallPath.CountUsed() == 0)
 	{
-		TArray<FString> SteamInstallFolders;
+		TArray<FString> SteamInstallFolders = GetSteamLibraryFolders();
 
-#ifdef __APPLE__
-		FString appSupportPath = OSX_FindFolder(DIR_ApplicationSupport);
-		FString regPath = appSupportPath + "/Steam/config/config.vdf";
-		try
+		for(unsigned int i = 0; i < SteamInstallFolders.Size(); ++i)
 		{
-			
-			SteamInstallFolders = ParseSteamRegistry(regPath);
-		}
-		catch(class CDoomError &error)
-		{
-			// If we can't parse for some reason just pretend we can't find anything.
-			return FString();
-		}
-
-		SteamInstallFolders.Push(appSupportPath + "/Steam/SteamApps/common");
-#else
-		char* home = getenv("HOME");
-		if(home != NULL && *home != '\0')
-		{
-			// [BL] The config seems to have moved from the more modern .local to
-			// .steam at some point. Not sure if it's just my setup so I guess we
-			// can fall back on it?
-			auto attemptPaths = std::array<FString, 2>{"/.steam/config/config.vdf", "/.local/share/Steam/config/config.vdf"};
-			for(auto regPath : attemptPaths)
-			{
-				regPath = FString(home) + regPath;
-				try
-				{
-					SteamInstallFolders = ParseSteamRegistry(regPath);
-					break;
-				}
-				catch(class CDoomError &error)
-				{
-				}
-			}
-			if(SteamInstallFolders.Size() == 0)
-			{
-				// If we can't parse for some reason just pretend we can't find anything.
-				return FString();
-			}
-
-			auto regPath = FString(home) + "/.local/share/Steam/SteamApps/common";
-			SteamInstallFolders.Push(regPath);
-		}
-#endif
-
-		for(unsigned int i = 0;i < SteamInstallFolders.Size();++i)
-		{
-			for(unsigned int app = 0;app < NUM_STEAM_APPS;++app)
+			for(unsigned int app = 0; app < NUM_STEAM_APPS; ++app)
 			{
 				struct stat st;
-				FString candidate(SteamInstallFolders[i] + "/" + AppInfo[app].BasePath);
+				FString candidate(SteamInstallFolders[i] + PATH_SEPARATOR + AppInfo[app].BasePath);
 				if(stat(candidate, &st) == 0 && S_ISDIR(st.st_mode))
 					SteamAppInstallPath[AppInfo[app].AppID] = candidate;
 			}
 		}
 	}
-	const FString *installPath = SteamAppInstallPath.CheckKey(AppInfo[game].AppID);
+	const FString* installPath = SteamAppInstallPath.CheckKey(AppInfo[game].AppID);
 	if(installPath)
 		return *installPath;
+	return FString();
+}
+
+FString GetGOGPath(ESteamApp game)
+{
+	static struct SteamAppInfo
+	{
+		const char* const AppID;
+	} AppInfo[NUM_STEAM_APPS] =
+	{
+		{"1847884051"}, // Wolfenstein II
+		{NULL} // Wolfenstein Youngblood
+	};
+
+	if(AppInfo[game].AppID == NULL)
+		return FString();
+
+#if defined(_WIN32)
+	FString path;
+
+
+	//==========================================================================
+	//
+	// I_GetGogPaths
+	//
+	// Check the registry for GOG installation paths, so we can search for IWADs
+	// that were bought from GOG.com. This is a bit different from the Steam
+	// version because each game has its own independent installation path, no
+	// such thing as <steamdir>/SteamApps/common/<GameName>.
+	//
+	//==========================================================================
+
+#ifdef _WIN64
+	FString gogregistrypath = "Software\\Wow6432Node\\GOG.com\\Games";
+#else
+	// If a 32-bit ZDoom runs on a 64-bit Windows, this will be transparently and
+	// automatically redirected to the Wow6432Node address instead, so this address
+	// should be safe to use in all cases.
+	FString gogregistrypath = "Software\\GOG.com\\Games";
+#endif
+
+	if(QueryPathKey(HKEY_LOCAL_MACHINE, gogregistrypath + PATH_SEPARATOR + AppInfo[game].AppID, "Path", path))
+		return path;
+	return FString();
+#else
 	return FString();
 #endif
 }

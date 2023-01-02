@@ -13,4 +13,5 @@ namespace FileSys
 	};
 
 	FString GetSteamPath(ESteamApp game);
+	FString GetGOGPath(ESteamApp game);
 }

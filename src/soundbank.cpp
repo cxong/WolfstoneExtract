@@ -147,7 +147,7 @@ FSoundbank::FSoundbank(FileReader *reader)
 			throw CRecoverableError("Missing BKHD fourcc");
 		foundFourCC = true;
 
-		chunkMap[section.Id] = {.Offset = offset, .Length = section.Length, .Id = 0, .Data = {}};
+		chunkMap[section.Id] = {/*.Offset =*/ offset, /*.Length =*/ section.Length, /*.Id =*/ 0, /*.Data =*/ {}};
 
 		offset += section.Length + sizeof(section);
 		reader->Seek(section.Length, SEEK_CUR);
@@ -213,7 +213,7 @@ FSoundbank::FSoundbank(FileReader *reader)
 			wemToSoundId[index.WemId] = index.WemId;
 		//printf("%u: WemId = %X, Offset = %u, Length = %u; Sound Id = %X\n", i, index.WemId, index.Offset, index.Length, wemToSoundId[index.WemId]);
 
-		Sounds[i] = {.Offset = dataChunk->Offset + index.Offset, .Length = index.Length, .Id = wemToSoundId[index.WemId], .Data = {}};
+		Sounds[i] = {/*.Offset =*/ dataChunk->Offset + index.Offset, /*.Length =*/ index.Length, /*.Id =*/ wemToSoundId[index.WemId], /*.Data =*/ {}};
 	}
 
 	printf("Processing sound bank ");
