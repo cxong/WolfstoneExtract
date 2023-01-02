@@ -410,14 +410,17 @@ FString GetGOGPath(ESteamApp game)
 {
 	static struct SteamAppInfo
 	{
-		const char* const AppID;
+		const char* const AppID[3]; // NULL terminated list of up to two ids
+		const char* const MacFolder;
+		const char* const LinuxFolder;
+		const char* const LinuxXdgApp;
 	} AppInfo[NUM_STEAM_APPS] =
 	{
-		{"1847884051"}, // Wolfenstein II
-		{NULL} // Wolfenstein Youngblood
+		{{"1847884051", "1285433790"}, NULL, NULL, NULL}, // Wolfenstein II
+		{{NULL}, NULL, NULL, NULL} // Wolfenstein Youngblood
 	};
 
-	if(AppInfo[game].AppID == NULL)
+	if(AppInfo[game].AppID[0] == NULL)
 		return FString();
 
 #if defined(_WIN32)
@@ -444,10 +447,37 @@ FString GetGOGPath(ESteamApp game)
 	FString gogregistrypath = "Software\\GOG.com\\Games";
 #endif
 
-	if(QueryPathKey(HKEY_LOCAL_MACHINE, gogregistrypath + PATH_SEPARATOR + AppInfo[game].AppID, "Path", path))
-		return path;
+	for(const char* const* id = AppInfo[game].AppID; *id; ++id)
+	{
+		if(QueryPathKey(HKEY_LOCAL_MACHINE, gogregistrypath + PATH_SEPARATOR + *id, "Path", path))
+			return path;
+	}
+	return FString();
+#elif defined(__APPLE__)
+	/* The GOG macOS installers don't register themselves with pkgutil and they
+	 * prompt the user to pick an install location in the postintall script. The
+	 * only realistic way to find them would be to look in ~/Documents (the
+	 * default location it prompts to) and /Applications.
+	 *
+	 * If the user is using GOG Galaxy, the installation information is stored in
+	 * a sqlite database. /Users/Shared/GOG.com/Galaxy/config.json has the
+	 * storagePath key and the galaxy-2.0.db file has the application id and path
+	 * in the InstalledBaseProducts table.
+	 *
+	 * This is not yet implemented as the games available on macOS are not yet
+	 * supported so not worth writing the detection code at this time.
+	 */
 	return FString();
 #else
+	/* On Linux GOG uses MojoSetup which doesn't have any central database. The
+	 * default install location is "~/GOG Games". If the user chooses to install
+	 * the menu item, then the XDG desktop file will be installed in the user's
+	 * XDG applications directory. This could be used to trace a non-default
+	 * location.
+	 *
+	 * This is not yet implemented as the games available for Linux are not yet
+	 * supported so not worth writing the detection code at this time.
+	 */
 	return FString();
 #endif
 }
