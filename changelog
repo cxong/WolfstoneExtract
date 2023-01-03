@@ -10,7 +10,7 @@ wolfstoneextract (1.2) stable; urgency=medium
   * Fixed issues with optimizing ooz on recent compilers.
   * Minor adjustments in wording to clarify usage.
 
- -- Braden Obrzut <admin@maniacsvault.net>  Fri, 13 May 2022 23:01:00 -0500
+ -- Braden Obrzut <admin@maniacsvault.net>  Mon, 02 Jan 2023 23:15:00 -0500
 
 wolfstoneextract (1.1) stable; urgency=medium
 
