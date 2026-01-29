@@ -30,4 +30,4 @@ Text strings are stored in an encrypted and compressed text file in the base gam
 * [Ooz (Kraken)](https://github.com/powzix/ooz)
 * [Wwise sound bank extractor](https://github.com/eXpl0it3r/bnkextr)
 * [Wwise WEM to Ogg](https://github.com/hcs64/ww2ogg)
-* [ZenHAX thread on IDCL format](https://zenhax.com/viewtopic.php?t=5148)
+* [ZenHAX thread on IDCL format](https://zenhax.com/viewtopic.php@t=5148.html)
